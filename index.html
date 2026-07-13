@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 移动端自适应 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的导航站</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", system-ui, sans-serif;
+        }
+        body {
+            background-color: #f0f4f8;
+            padding: 60px 16px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #222;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .time-tip {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        .group-title {
+            font-size: 18px;
+            color: #444;
+            margin: 28px 0 14px;
+            border-left: 4px solid #4096ff;
+            padding-left: 12px;
+            font-weight: 500;
+        }
+        .btn-wrap {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+        /* 手机端自动变成1列 */
+        @media (max-width: 420px) {
+            .btn-wrap {
+                grid-template-columns: 1fr;
+            }
+        }
+        a.button {
+            display: block;
+            text-align: center;
+            padding: 16px;
+            background: #fff;
+            border: 1px solid #dde4ec;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #222;
+            font-size: 15px;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+        a.button:hover {
+            background: #4096ff;
+            color: white;
+            border-color: #4096ff;
+            box-shadow: 0 4px 12px rgba(64, 150, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        /* 下载按钮特殊标识 */
+        a.button[download]::after {
+            content: " ↓";
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>个人导航页</h1>
+        <div class="time-tip" id="nowTime"></div>
+
+        <div class="group-title">仓库文件</div>
+        <div class="btn-wrap">
+            <a class="button" href="./bible.txt" target="_blank">bible.txt</a>
+            <a class="button" href="./ChromeGPT_installer.exe" download target="_blank">ChromeGPT安装包</a>
+        </div>
+
+        <div class="group-title">常用网站</div>
+        <div class="btn-wrap">
+            <a class="button" href="https://edu.codemao.com" target="_blank">编程猫</a>
+            <a class="button" href="https://bilibili.com" target="_blank">B站</a>
+            <a class="button" href="https://bing.com" target="_blank">必应</a>
+            <a class="button" href="https://github.com" target="_blank">GitHub</a>
+        </div>
+    </div>
+
+    <script>
+        // 实时时间显示
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('nowTime').innerText = now.toLocaleString('zh-CN');
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>
