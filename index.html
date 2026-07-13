@@ -2,9 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <!-- 移动端自适应 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的导航站</title>
+    <title>华丽特效导航站</title>
     <style>
         * {
             margin: 0;
@@ -13,40 +12,80 @@
             font-family: "Microsoft Yahei", system-ui, sans-serif;
         }
         body {
-            background-color: #f0f4f8;
-            padding: 60px 16px;
             min-height: 100vh;
+            padding: 60px 16px;
+            overflow-x: hidden;
+            /* 渐变底色 */
+            background: linear-gradient(-45deg, #0f172a, #1e293b, #192f4b, #0c2340);
+            background-size: 400% 400%;
+            animation: bgFlow 15s ease infinite;
+        }
+        /* 流动渐变背景动画 */
+        @keyframes bgFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        /* 粒子画布全屏固定 */
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
         }
         .container {
-            max-width: 600px;
+            max-width: 620px;
             margin: 0 auto;
+            position: relative;
+            z-index: 2;
+            animation: pageFade 1.2s ease-out;
+        }
+        /* 页面淡入入场 */
+        @keyframes pageFade {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         h1 {
             text-align: center;
-            color: #222;
-            margin-bottom: 10px;
-            font-size: 28px;
+            font-size: 36px;
+            margin-bottom: 12px;
+            /* 彩虹渐变发光文字 */
+            background: linear-gradient(90deg, #4096ff, #36e8ff, #a36bff, #ff6eb4);
+            background-size: 300% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: textRainbow 6s linear infinite;
+            text-shadow: 0 0 20px rgba(64,150,255,0.4);
+        }
+        @keyframes textRainbow {
+            to { background-position: 300% center; }
         }
         .time-tip {
             text-align: center;
-            color: #666;
-            margin-bottom: 40px;
+            color: #b8d8ff;
+            margin-bottom: 45px;
+            font-size: 15px;
+            letter-spacing: 1px;
         }
         .group-title {
-            font-size: 18px;
-            color: #444;
-            margin: 28px 0 14px;
-            border-left: 4px solid #4096ff;
-            padding-left: 12px;
+            font-size: 19px;
+            color: #e0ecff;
+            margin: 32px 0 16px;
+            border-left: 4px solid #40ccff;
+            padding-left: 14px;
             font-weight: 500;
+            text-shadow: 0 0 8px rgba(64,204,255,0.35);
         }
         .btn-wrap {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 14px;
+            gap: 16px;
         }
-        /* 手机端自动变成1列 */
-        @media (max-width: 420px) {
+        @media (max-width: 430px) {
             .btn-wrap {
                 grid-template-columns: 1fr;
             }
@@ -54,57 +93,130 @@
         a.button {
             display: block;
             text-align: center;
-            padding: 16px;
-            background: #fff;
-            border: 1px solid #dde4ec;
-            border-radius: 10px;
+            padding: 18px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 12px;
             text-decoration: none;
-            color: #222;
-            font-size: 15px;
-            transition: all 0.25s ease;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            color: #e8f3ff;
+            font-size: 16px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(100, 180, 255, 0.18);
+            transition: all 0.3s cubic-bezier(0.2,0,0.2,1);
+            backdrop-filter: blur(6px);
+        }
+        /* 按钮流光层 */
+        a.button::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(80,190,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        a.button:hover::before {
+            left: 100%;
         }
         a.button:hover {
-            background: #4096ff;
-            color: white;
-            border-color: #4096ff;
-            box-shadow: 0 4px 12px rgba(64, 150, 255, 0.3);
-            transform: translateY(-2px);
+            transform: translateY(-6px) scale(1.03);
+            border-color: #40ccff;
+            box-shadow: 0 0 25px rgba(64, 204, 255, 0.45), 0 8px 24px rgba(0,0,0,0.3);
+            background: rgba(64,150,255,0.15);
         }
-        /* 下载按钮特殊标识 */
+        /* 下载按钮闪动特效 */
+        a.button[download] {
+            animation: downloadShine 3.5s ease-in-out infinite;
+        }
+        @keyframes downloadShine {
+            0%,100% { box-shadow: none; }
+            50% { box-shadow: 0 0 16px #36e8ff; }
+        }
         a.button[download]::after {
-            content: " ↓";
+            content: " ↓ 文件下载";
+            font-size: 13px;
+            display: block;
+            margin-top: 4px;
+            opacity: 0.8;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>个人导航页</h1>
-        <div class="time-tip" id="nowTime"></div>
+<!-- 粒子星空画布 -->
+<canvas id="particles"></canvas>
+<div class="container">
+    <h1>个人华丽导航页</h1>
+    <div class="time-tip" id="nowTime"></div>
 
-        <div class="group-title">仓库文件</div>
-        <div class="btn-wrap">
-            <a class="button" href="./bible.txt" target="_blank">bible.txt</a>
-            <a class="button" href="./ChormeGPT_installer.exe" download target="_blank">ChormeGPT安装包</a>
-        </div>
-
-        <div class="group-title">常用网站</div>
-        <div class="btn-wrap">
-            <a class="button" href="https://edu.codemao.cn" target="_blank">编程猫</a>
-            <a class="button" href="https://bilibili.com" target="_blank">B站</a>
-            <a class="button" href="https://bing.com" target="_blank">必应</a>
-            <a class="button" href="https://github.com" target="_blank">GitHub</a>
-        </div>
+    <div class="group-title">仓库文件</div>
+    <div class="btn-wrap">
+        <a class="button" href="./bible.txt" target="_blank">bible.txt 文本</a>
+        <a class="button" href="./ChromeGPT_installer.exe" download target="_blank">ChromeGPT安装包</a>
     </div>
 
-    <script>
-        // 实时时间显示
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('nowTime').innerText = now.toLocaleString('zh-CN');
-        }
-        updateTime();
-        setInterval(updateTime, 1000);
-    </script>
+    <div class="group-title">常用网站</div>
+    <div class="btn-wrap">
+        <a class="button" href="https://edu.codemao.com" target="_blank">编程猫</a>
+        <a class="button" href="https://bilibili.com" target="_blank">B站</a>
+        <a class="button" href="https://bing.com" target="_blank">必应搜索</a>
+        <a class="button" href="https://github.com" target="_blank">GitHub</a>
+    </div>
+</div>
+
+<script>
+// 实时时钟
+function updateTime(){
+    const now=new Date();
+    document.getElementById('nowTime').innerText=now.toLocaleString('zh-CN',{hour12:false});
+}
+updateTime();
+setInterval(updateTime,1000);
+
+// 粒子星空特效
+const canvas=document.getElementById('particles');
+const ctx=canvas.getContext('2d');
+let w,h,particles=[];
+function resize(){
+    w=canvas.width=window.innerWidth;
+    h=canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener('resize',resize);
+
+class Particle{
+    constructor(){
+        this.x=Math.random()*w;
+        this.y=Math.random()*h;
+        this.r=Math.random()*1.8+0.4;
+        this.speedX=Math.random()*0.6-0.3;
+        this.speedY=Math.random()*0.6-0.3;
+        this.op=Math.random();
+    }
+    draw(){
+        ctx.beginPath();
+        ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+        ctx.fillStyle=`rgba(150,210,255,${this.op})`;
+        ctx.fill();
+    }
+    update(){
+        this.x+=this.speedX;
+        this.y+=this.speedY;
+        if(this.x<0)this.x=w;
+        if(this.x>w)this.x=0;
+        if(this.y<0)this.y=h;
+        if(this.y>h)this.y=0;
+    }
+}
+// 创建粒子
+for(let i=0;i<90;i++) particles.push(new Particle());
+// 渲染循环
+function render(){
+    ctx.clearRect(0,0,w,h);
+    particles.forEach(p=>{p.update();p.draw();});
+    requestAnimationFrame(render);
+}
+render();
+</script>
 </body>
 </html>
