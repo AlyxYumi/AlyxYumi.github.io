@@ -1,13 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="一个简洁大气的个人博客 - 记录思考、技术与生活">
+  <title>墨迹 · 个人博客</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9999;</text></svg>">
+</head>
 <body>
-<div>
-<a href="https://alyxyumi.github.io/bible.txt" target="_blank">bible.txt</a><br>
-<a href="https://alyxyumi.github.io/ChormeGPT_installer.exe" target="_blank">ChormeGPT_installer.exe</a><br>
-<a href="https://edu.codemao.cn" target="_blank">edu.codemao.cn</a><br>
-<a href="https://bilibili.com" target="_blank">bilibili.com</a><br>
-<a href="https://bing.com" target="_blank">bing.com</a><br>
-<a href="https://github.com" target="_blank">github.com</a>
-</div>
+  <!-- Reading progress bar -->
+  <div class="reading-progress" id="readingProgress"></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#/" class="logo">
+        <span class="logo-icon">&#9999;</span>
+        <span class="logo-text">墨迹</span>
+      </a>
+      <nav class="site-nav">
+        <a href="#/" class="nav-link" data-route="/">首页</a>
+        <a href="#/links" class="nav-link" data-route="/links">导航</a>
+        <a href="#/about" class="nav-link" data-route="/about">关于</a>
+        <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="site-main" id="app">
+    <!-- Content rendered by JavaScript -->
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <p class="footer-text">&copy; 2026 墨迹 · 用文字记录生活</p>
+        <div class="footer-links">
+          <a href="#/" class="footer-link">首页</a>
+          <a href="#/links" class="footer-link">导航</a>
+          <a href="#/about" class="footer-link">关于</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Back to top -->
+  <button class="back-to-top" id="backToTop" aria-label="回到顶部">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="19" x2="12" y2="5"></line>
+      <polyline points="5 12 12 5 19 12"></polyline>
+    </svg>
+  </button>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="js/posts.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
