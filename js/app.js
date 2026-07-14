@@ -192,6 +192,18 @@
   function renderLinks() {
     var categories = [
       {
+        title: "\u2b50 \u6211\u7684\u6536\u85cf",
+        links: [
+          { name: "\u54d4\u54e9\u54d4\u54e9", url: "https://www.bilibili.com", desc: "\u56fd\u5185\u77e5\u540d\u5f39\u5e55\u89c6\u9891\u7f51\u7ad9\uff0c\u5b66\u4e60\u4e0e\u5a31\u4e50\u7684\u5b9d\u85cf\u5e73\u53f0", icon: "&#127916;", badge: "" },
+          { name: "\u5fc5\u5e94\u641c\u7d22", url: "https://www.bing.com", desc: "\u5fae\u8f6f\u65d7\u4e0b\u7684\u641c\u7d22\u5f15\u64ce\uff0c\u6bcf\u65e5\u7cbe\u9009\u7cbe\u7f8e\u58c1\u7eb8", icon: "&#128269;", badge: "" },
+          { name: "GitHub", url: "https://github.com", desc: "\u5168\u7403\u6700\u5927\u7684\u4ee3\u7801\u6258\u7ba1\u5e73\u53f0\uff0c\u5f00\u53d1\u8005\u7684\u793e\u4ea4\u7f51\u7edc", icon: "&#128187;", badge: "" },
+          { name: "\u7f16\u7a0b\u732b", url: "https://edu.codemao.cn", desc: "\u9752\u5c11\u5e74\u7f16\u7a0b\u6559\u80b2\u5e73\u53f0\uff0c\u8da3\u5473\u5b66\u4e60\u7f16\u7a0b\u77e5\u8bc6", icon: "&#128049;", badge: "" },
+          { name: "Bible.txt", url: "https://alyxyumi.github.io/bible.txt", desc: "\u5723\u7ecf\u6587\u672c\u8d44\u6e90\uff0c\u5728\u7ebf\u9605\u8bfb\u5b8c\u6574\u5185\u5bb9", icon: "&#128214;", badge: "TXT", badgeClass: "text" },
+          { name: "ChromeGPT \u5b89\u88c5\u7a0b\u5e8f", url: "https://alyxyumi.github.io/ChromeGPT_installer.exe", desc: "ChromeGPT \u6d4f\u89c8\u5668\u6269\u5c55\u5b89\u88c5\u5305\uff0c\u70b9\u51fb\u4e0b\u8f7d", icon: "&#128230;", badge: "EXE", badgeClass: "download" },
+          { name: "GitHub Pages", url: "https://alyxyumi.github.io", desc: "\u6211\u7684\u4e2a\u4eba\u535a\u5ba2\u7f51\u7ad9\uff0c\u5c31\u662f\u4f60\u73b0\u5728\u770b\u7684\u8fd9\u4e2a", icon: "&#127748;", badge: "" }
+        ]
+      },
+      {
         title: "\u23e9 Minecraft",
         links: [
           { name: "Minecraft \u5b98\u7f51", url: "https://www.minecraft.net", desc: "Minecraft \u5b98\u65b9\u7f51\u7ad9\uff0c\u6700\u65b0\u8d44\u8baf\u4e0e\u5546\u5e97", icon: "&#9962;", badge: "" },
