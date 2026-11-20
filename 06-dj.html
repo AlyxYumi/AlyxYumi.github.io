@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>双盘打碟台 · 浏览器 DJ</title>
+<style>
+  :root{--a:#46d9ff;--b:#ff74d4;--bg:#07080c;--line:#1d2430;--txt:#c8d4e2}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:
+    radial-gradient(1200px 600px at 20% -10%,#12202e 0%,transparent 60%),
+    radial-gradient(900px 500px at 90% 110%,#2a1024 0%,transparent 60%),var(--bg);
+    color:var(--txt);font-family:ui-monospace,"SFMono-Regular",Consolas,monospace;
+    -webkit-user-select:none;user-select:none}
+  #app{max-width:1180px;margin:0 auto;padding:22px 20px 40px}
+  header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:17px;letter-spacing:.28em;margin:0;font-weight:600;color:#eaf4ff}
+  header .tag{font-size:11px;color:#5d7186;letter-spacing:.2em}
+  .transport{display:flex;gap:10px;align-items:center;margin-left:auto;font-size:12px;color:#7b8ea3}
+  button{font:inherit;font-size:12px;background:#0d131b;color:#b9cadb;border:1px solid var(--line);
+    padding:7px 12px;cursor:pointer;letter-spacing:.08em}
+  button:hover{border-color:#2c3d52;color:#fff}
+  button.on{background:#16394d;border-color:#2b6f92;color:#bff0ff}
+  #stage{display:grid;grid-template-columns:1fr 132px 1fr;gap:18px;align-items:stretch}
+  @media(max-width:820px){#stage{grid-template-columns:1fr}}
+  .deck{border:1px solid var(--line);background:linear-gradient(180deg,#0b1016,#080b10);padding:16px;position:relative;overflow:hidden}
+  .deck:before{content:"";position:absolute;inset:0 0 auto;height:2px;background:var(--hue);opacity:.8}
+  .deck h2{margin:0 0 2px;font-size:12px;letter-spacing:.22em;color:#dfeaf6;font-weight:600}
+  .deck .root{font-size:10px;color:#5c6f83;letter-spacing:.16em;margin-bottom:14px}
+  .pad{display:flex;align-items:center;gap:10px;width:100%;padding:0;border:1px solid #131a24;
+    background:#0a0f15;margin-bottom:6px;cursor:pointer;transition:background .12s,border-color .12s;text-align:left}
+  .pad:hover{border-color:#243343}
+  .pad .lbl{width:52px;font-size:11px;letter-spacing:.1em;color:#6c8098;padding-left:9px;flex:none}
+  .pad .mini{flex:1;height:22px;image-rendering:pixelated;display:block}
+  .pad .state{width:8px;height:8px;border-radius:50%;background:#22303e;margin-right:8px;flex:none}
+  .pad.live{background:#0f1a22;border-color:#28455a}
+  .pad.live .lbl{color:#bfe6f5}
+  .pad.live .state{background:var(--hue);box-shadow:0 0 8px var(--hue)}
+  .knobs{display:flex;gap:16px;margin-top:14px;align-items:center}
+  .knob{flex:1}
+  .knob label{display:block;font-size:10px;letter-spacing:.16em;color:#5f7387;margin-bottom:6px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:#1b2532;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:var(--hue);cursor:pointer;box-shadow:0 0 8px var(--hue)}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--hue)}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    border:1px solid var(--line);background:#080b10;padding:14px 10px}
+  .center .beat{font-size:34px;letter-spacing:.04em;color:#eaf4ff;line-height:1}
+  .center .bar{font-size:10px;letter-spacing:.2em;color:#5d7186}
+  .dot{width:9px;height:9px;border-radius:50%;background:#243040;transition:background .05s,box-shadow .05s}
+  .dot.hit{background:#ffe27a;box-shadow:0 0 14px #ffe27a}
+  .xf{writing-mode:vertical-lr;direction:rtl;height:130px;width:26px;margin:0 auto;
+    -webkit-appearance:none;appearance:none;background:#141c26;outline:none;border:1px solid #1c2632}
+  .xf::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:16px;background:#dfe9f5;cursor:pointer}
+  .xf::-moz-range-thumb{width:24px;height:16px;border:0;background:#dfe9f5;cursor:pointer}
+  .xp{font-size:10px;letter-spacing:.16em;color:#5f7387;text-align:center;margin-top:4px}
+  footer{margin-top:22px;font-size:11px;color:#54687c;line-height:2;letter-spacing:.04em}
+  footer b{color:#8ea6bd;font-weight:400}
+  #boot{position:fixed;inset:0;display:grid;place-items:center;background:#05070ae8;z-index:20;text-align:center}
+  #boot.hide{display:none}
+  #boot .box{border:1px solid #1e2a38;background:#080c11;padding:34px 40px;max-width:460px}
+  #boot h3{margin:0 0 8px;font-size:15px;letter-spacing:.18em;color:#e6f1fb;font-weight:600}
+  #boot p{font-size:12px;line-height:1.9;color:#7c90a5;margin:0 0 20px}
+  #boot button{background:#17364a;border-color:#2b6f92;color:#cdf1ff;padding:11px 26px;letter-spacing:.2em}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>双盘打碟台</h1>
+    <span class="tag">TWO DECKS · 零音频素材 · 全部现场合成</span>
+    <div class="transport">
+      <span>BPM</span>
+      <button id="bpmDown">−</button>
+      <span id="bpmVal" style="color:#eaf4ff;min-width:34px;text-align:center">124</span>
+      <button id="bpmUp">+</button>
+      <button id="playBtn">▶ 播放</button>
+      <span style="margin-left:14px">MASTER</span>
+      <input id="masterVol" type="range" min="0" max="100" value="82" style="width:90px">
+      <button id="fxBtn" title="把整条总线送进回声">ECHO</button>
+    </div>
+  </header>
+
+  <div id="stage">
+    <section class="deck" id="deckA" style="--hue:var(--a)">
+      <h2>DECK A</h2>
+      <div class="root">TECHNO · A MINOR · 合成鼓组</div>
+      <div id="padsA"></div>
+      <div class="knobs">
+        <div class="knob"><label>FILTER（低通扫频）</label><input type="range" min="0" max="100" value="100" id="filtA"></div>
+        <div class="knob" style="flex:0 0 64px"><label>LEVEL</label><input type="range" min="0" max="100" value="80" id="lvlA"></div>
+      </div>
+    </section>
+
+    <div class="center">
+      <div class="beat" id="beatNum">1</div>
+      <div class="bar" id="barNum">BAR 1</div>
+      <div class="dot" id="pulse"></div>
+      <div style="margin-top:6px">
+        <input class="xf" id="xfader" type="range" min="0" max="100" value="50" orient="vertical">
+        <div class="xp">A ◄► B</div>
+      </div>
+    </div>
+
+    <section class="deck" id="deckB" style="--hue:var(--b)">
+      <h2>DECK B</h2>
+      <div class="root">DEEP HOUSE · F MINOR · 合成鼓组</div>
+      <div id="padsB"></div>
+      <div class="knobs">
+        <div class="knob"><label>FILTER（低通扫频）</label><input type="range" min="0" max="100" value="100" id="filtB"></div>
+        <div class="knob" style="flex:0 0 64px"><label>LEVEL</label><input type="range" min="0" max="100" value="80" id="lvlB"></div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <b>玩法：</b>两盘永远同步（同一个时钟、同一个速率），你只做三件事 —— 推 <b>横推子</b> 换盘、拧 <b>低通</b> 做过渡、点 <b>PAD</b> 拆轨。<br>
+    <b>键盘：</b><b>1–5</b> 打 A 盘音轨 · <b>6–0</b> 打 B 盘音轨 · <b>空格</b> 播放/停止 · <b>← →</b> 横推子 · <b>[ ]</b> 调 BPM<br>
+    <b>技巧：</b>先只留鼓，第 16 拍把 B 盘的 bass 推进来 —— 这是最省事的“换盘不尴尬”做法。
+  </footer>
+</div>
+
+<div id="boot">
+  <div class="box">
+    <h3>先合成这套鼓组</h3>
+    <p>没有用任何 mp3 —— 底鼓、军鼓、踩镲、贝斯、和弦全部用 Web Audio 的振荡器和噪声实时算出来，
+      两个盘共用 32 个十六分音符的循环长度，所以从第一个采样点就是对齐的。</p>
+    <button id="bootBtn">开始打碟</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= 常量 ================= */
+  const SR = 44100;
+  const STEPS = 32;              // 两小节十六分音符
+  const BASE_BPM = 120;          // 合成时的基准速度
+  const STEP_SEC = 60 / BASE_BPM / 4;
+  const LOOP_SEC = STEPS * STEP_SEC;
+  const LOOP_LEN = Math.round(LOOP_SEC * SR);
+
+  /* ================= 图案 ================= */
+  function mk(idx) {
+    const a = new Array(STEPS).fill(0);
+    for (const i of idx) a[i] = 1;
+    return a;
+  }
+  function bassPat(map) {
+    const a = new Array(STEPS).fill(null);
+    for (const k in map) a[+k] = map[k];
+    return a;
+  }
+
+  const DEFS = [
+    {
+      id: "A", name: "DECK A", root: 55, hue: "#46d9ff",
+      kick: mk([0, 4, 8, 12, 16, 20, 24, 28]),
+      snare: mk([4, 12, 20, 28]),
+      hat: mk([2, 6, 10, 14, 18, 22, 26, 30, 31]),
+      bass: bassPat({ 0: 0, 3: 0, 6: 3, 10: 3, 14: 7, 16: 0, 19: 0, 22: 5, 26: 5, 30: 3 }),
+      chord: mk([2, 10, 18, 26]),
+      chordNotes: [0, 3, 7, 10]
+    },
+    {
+      id: "B", name: "DECK B", root: 43.65, hue: "#ff74d4",
+      kick: mk([0, 4, 8, 12, 20, 24, 28, 30]),
+      snare: mk([4, 12, 20, 28]),
+      hat: mk([2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 30]),
+      bass: bassPat({ 0: 0, 2: 0, 6: 0, 8: 5, 12: 0, 14: 0, 18: 3, 20: 3, 24: 0, 26: 7, 30: 7 }),
+      chord: mk([6, 14, 22, 30]),
+      chordNotes: [0, 3, 7, 12]
+    }
+  ];
+
+  const STEMS = [
+    { key: "kick", label: "KICK" },
+    { key: "snare", label: "SNARE" },
+    { key: "hat", label: "HAT" },
+    { key: "bass", label: "BASS" },
+    { key: "chord", label: "CHORD" }
+  ];
+
+  const hz = function (root, semi) { return root * Math.pow(2, semi / 12); };
+
+  /* ================= 合成器 ================= */
+  function synthKick(d, i0) {
+    const n = Math.floor(0.34 * SR);
+    let phase = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) {
+      const t = i / SR;
+      const f = 46 + 130 * Math.exp(-t * 30);
+      phase += 2 * Math.PI * f / SR;
+      const env = Math.exp(-t * 7.2);
+      d[i0 + i] += Math.sin(phase) * env * 0.92 + (Math.random() * 2 - 1) * Math.exp(-t * 200) * 0.18;
+    }
+  }
+  function synthSnare(d, i0) {
+    const n = Math.floor(0.2 * SR);
+    let lp = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) {
+      const t = i / SR;
+      const nz = Math.random() * 2 - 1;
+      lp += (nz - lp) * 0.42;
+      const env = Math.exp(-t * 17);
+      d[i0 + i] += (nz - lp) * env * 0.6 + Math.sin(2 * Math.PI * 188 * t) * Math.exp(-t * 30) * 0.32;
+    }
+  }
+  function synthHat(d, i0) {
+    const n = Math.floor(0.075 * SR);
+    let lp = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) {
+      const t = i / SR;
+      const nz = Math.random() * 2 - 1;
+      lp += (nz - lp) * 0.72;
+      d[i0 + i] += (nz - lp) * Math.exp(-t * 55) * 0.26;
+    }
+  }
+  function synthBass(d, i0, freq, dur) {
+    const n = Math.floor(dur * SR);
+    let lp = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) {
+      const t = i / SR;
+      const ph = (t * freq) % 1;
+      const saw = 2 * ph - 1;
+      lp += (saw - lp) * 0.11;
+      const env = Math.min(1, t * 200) * Math.exp(-t * 3.4);
+      d[i0 + i] += Math.tanh(lp * 2.2) * env * 0.55;
+    }
+  }
+  function synthChord(d, i0, freqs, dur) {
+    const n = Math.floor(dur * SR);
+    let lp = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) {
+      const t = i / SR;
+      let s = 0;
+      for (let k = 0; k < freqs.length; k++) {
+        const f = freqs[k] * (1 + (k % 2 ? 0.0035 : -0.0035));
+        s += (2 * ((t * f) % 1) - 1) * 0.33;
+      }
+      lp += (s - lp) * 0.2;
+      const env = Math.min(1, t * 90) * Math.exp(-t * 4.2);
+      d[i0 + i] += lp * env * 0.5;
+    }
+  }
+
+  function renderDeck(def) {
+    const out = {};
+    // 鼓组：每个 stem 一条独立 buffer，相位完全对齐
+    const drumMap = { kick: synthKick, snare: synthSnare, hat: synthHat };
+    for (const key in drumMap) {
+      const buf = actx.createBuffer(1, LOOP_LEN, SR);
+      const d = buf.getChannelData(0);
+      const pat = def[key];
+      for (let s = 0; s < STEPS; s++) {
+        if (pat[s]) drumMap[key](d, Math.round(s * STEP_SEC * SR));
+      }
+      hardClip(d);
+      out[key] = { buffer: buf, pat: pat };
+    }
+    // 贝斯
+    {
+      const buf = actx.createBuffer(1, LOOP_LEN, SR);
+      const d = buf.getChannelData(0);
+      const pat = def.bass;
+      for (let s = 0; s < STEPS; s++) {
+        if (pat[s] !== null && pat[s] !== undefined) {
+          synthBass(d, Math.round(s * STEP_SEC * SR), hz(def.root, pat[s]), STEP_SEC * 3.1);
+        }
+      }
+      hardClip(d);
+      out.bass = { buffer: buf, pat: pat.map(v => (v === null || v === undefined ? 0 : 1)) };
+    }
+    // 和弦
+    {
+      const buf = actx.createBuffer(1, LOOP_LEN, SR);
+      const d = buf.getChannelData(0);
+      const pat = def.chord;
+      const freqs = def.chordNotes.map(n => hz(def.root * 4, n));
+      for (let s = 0; s < STEPS; s++) {
+        if (pat[s]) synthChord(d, Math.round(s * STEP_SEC * SR), freqs, STEP_SEC * 2.2);
+      }
+      hardClip(d);
+      out.chord = { buffer: buf, pat: pat };
+    }
+    return out;
+  }
+
+  function hardClip(d) {
+    for (let i = 0; i < d.length; i++) {
+      const v = d[i];
+      d[i] = v > 1 ? 1 : v < -1 ? -1 : v;
+    }
+  }
+
+  /* ================= 状态 ================= */
+  let actx = null, master = null, comp = null, delay = null, fb = null, wet = null;
+  let decks = [];
+  let bpm = 124;
+  let anchor = 0, anchorPhase = 0;
+  let playing = false;
+  let fxOn = false;
+  const padEls = {};
+
+  const $ = function (id) { return document.getElementById(id); };
+
+  function stepSec() { return 60 / bpm / 4; }
+
+  function currentStep() {
+    if (!actx || !playing) return 0;
+    const dt = actx.currentTime - anchor;
+    const s = anchorPhase + dt / stepSec();
+    return ((s % STEPS) + STEPS) % STEPS;
+  }
+
+  /* ================= 音频图 ================= */
+  function buildAudio() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC({ latencyHint: "interactive" });
+
+    comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -16;
+    comp.knee.value = 12;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.004;
+    comp.release.value = 0.14;
+    comp.connect(actx.destination);
+
+    master = actx.createGain();
+    master.gain.value = 0.8;
+    master.connect(comp);
+
+    delay = actx.createDelay(1.2);
+    delay.delayTime.value = 0.375;
+    fb = actx.createGain(); fb.gain.value = 0.4;
+    wet = actx.createGain(); wet.gain.value = 0;
+    delay.connect(fb); fb.connect(delay);
+    delay.connect(wet); wet.connect(comp);
+    master.connect(delay);
+
+    decks = DEFS.map(function (def) {
+      const filt = actx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = 22000;
+      filt.Q.value = 0.8;
+      const g = actx.createGain();
+      g.gain.value = 0.8;
+      const xf = actx.createGain();   // 横推子单独一级，避免和 LEVEL 抢同一个参数
+      xf.gain.value = 0.7;
+      filt.connect(g); g.connect(xf); xf.connect(master);
+
+      const bufMap = renderDeck(def);
+      const stems = STEMS.map(function (s) {
+        const sg = actx.createGain();
+        sg.gain.value = 0;
+        sg.connect(filt);
+        return { key: s.key, label: s.label, buffer: bufMap[s.key].buffer, pat: bufMap[s.key].pat, g: sg, on: false, src: null };
+      });
+      return { def: def, filt: filt, gain: g, xf: xf, stems: stems };
+    });
+  }
+
+  function startPlayback() {
+    if (!actx) return;
+    stopPlayback();
+    const t0 = actx.currentTime + 0.06;
+    anchor = t0;
+    anchorPhase = 0;
+    for (const dk of decks) {
+      for (const st of dk.stems) {
+        const src = actx.createBufferSource();
+        src.buffer = st.buffer;
+        src.loop = true;
+        src.playbackRate.value = bpm / BASE_BPM;
+        src.connect(st.g);
+        src.start(t0);
+        st.src = src;
+      }
+    }
+    playing = true;
+    $("playBtn").textContent = "■ 停止";
+    $("playBtn").classList.add("on");
+  }
+
+  function stopPlayback() {
+    for (const dk of decks) {
+      for (const st of dk.stems) {
+        if (st.src) {
+          try { st.src.stop(); } catch (e) { /* noop */ }
+          st.src.disconnect();
+          st.src = null;
+        }
+      }
+    }
+    playing = false;
+    $("playBtn").textContent = "▶ 播放";
+    $("playBtn").classList.remove("on");
+  }
+
+  function setBpm(v) {
+    const next = Math.max(90, Math.min(160, Math.round(v)));
+    if (next === bpm) return;
+    const ph = currentStep();
+    bpm = next;
+    // 变速时把相位锚点重设，保证两盘依然同步
+    if (actx) {
+      anchor = actx.currentTime;
+      anchorPhase = ph;
+      for (const dk of decks) {
+        for (const st of dk.stems) {
+          if (st.src) st.src.playbackRate.setValueAtTime(bpm / BASE_BPM, actx.currentTime);
+        }
+      }
+      if (playing) {
+        // 延迟跟随节拍（附点八分）
+        delay.delayTime.setTargetAtTime(stepSec() * 3, actx.currentTime, 0.05);
+      }
+    }
+    $("bpmVal").textContent = String(bpm);
+  }
+
+  /* ================= UI ================= */
+  function buildPads() {
+    decks.forEach(function (dk, di) {
+      const host = $(di === 0 ? "padsA" : "padsB");
+      host.innerHTML = "";
+      dk.stems.forEach(function (st, si) {
+        const btn = document.createElement("div");
+        btn.className = "pad";
+        btn.innerHTML = '<span class="lbl">' + st.label + '</span><canvas class="mini" width="192" height="22"></canvas><span class="state"></span>';
+        btn.style.setProperty("--hue", dk.def.hue);
+        btn.addEventListener("click", function () { toggleStem(dk, st); });
+        host.appendChild(btn);
+        st.el = btn;
+        st.canvas = btn.querySelector("canvas");
+        st.ctx2d = st.canvas.getContext("2d");
+        st.hue = dk.def.hue;
+      });
+    });
+  }
+
+  function toggleStem(dk, st) {
+    st.on = !st.on;
+    if (st.g && actx) st.g.gain.setTargetAtTime(st.on ? 1 : 0, actx.currentTime, 0.008);
+    st.el.classList.toggle("live", st.on);
+  }
+
+  function drawPads() {
+    const step = currentStep();
+    for (const dk of decks) {
+      for (const st of dk.stems) {
+        const c = st.ctx2d;
+        const w = c.canvas.width, h = c.canvas.height;
+        c.clearRect(0, 0, w, h);
+        const bw = w / STEPS;
+        for (let i = 0; i < STEPS; i++) {
+          if (st.pat[i]) {
+            c.fillStyle = st.on ? st.hue : "#2a3746";
+            c.globalAlpha = st.on ? 0.95 : 0.55;
+            c.fillRect(i * bw + 1, h * 0.35, bw - 2, h * 0.5);
+          } else {
+            c.fillStyle = "#121a23";
+            c.fillRect(i * bw + 1, h - 5, bw - 2, 3);
+          }
+        }
+        c.globalAlpha = 1;
+        c.fillStyle = "rgba(255,255,255,.85)";
+        c.fillRect(Math.floor(step) * bw, 0, 2, h);
+      }
+    }
+  }
+
+  /* ================= 主循环 ================= */
+  let lastBeat = -1;
+  function loop() {
+    const step = currentStep();
+    const beat = Math.floor(step / 4);
+    const bar = Math.floor(step / 16) + 1;
+    $("beatNum").textContent = String(beat + 1);
+    $("barNum").textContent = "BAR " + bar;
+    if (step !== lastBeat) {
+      lastBeat = step;
+      const p = $("pulse");
+      const onBar = step % 4 === 0;
+      p.classList.toggle("hit", onBar);
+      if (onBar) setTimeout(function () { p.classList.remove("hit"); }, 90);
+    }
+    if (actx) drawPads();
+    requestAnimationFrame(loop);
+  }
+
+  /* ================= 接线 ================= */
+  function wire() {
+    $("playBtn").addEventListener("click", function () {
+      if (!actx) return;
+      if (actx.state === "suspended") actx.resume();
+      if (playing) stopPlayback(); else startPlayback();
+    });
+    $("bpmUp").addEventListener("click", function () { setBpm(bpm + 1); });
+    $("bpmDown").addEventListener("click", function () { setBpm(bpm - 1); });
+    $("masterVol").addEventListener("input", function (e) {
+      const v = +e.target.value / 100;
+      master.gain.setTargetAtTime(v * v, actx.currentTime, 0.02);
+    });
+    $("fxBtn").addEventListener("click", function () {
+      fxOn = !fxOn;
+      wet.gain.setTargetAtTime(fxOn ? 0.55 : 0, actx.currentTime, 0.05);
+      this.classList.toggle("on", fxOn);
+    });
+    $("filtA").addEventListener("input", function (e) { setFilter(0, +e.target.value); });
+    $("filtB").addEventListener("input", function (e) { setFilter(1, +e.target.value); });
+    $("lvlA").addEventListener("input", function (e) { setLevel(0, +e.target.value); });
+    $("lvlB").addEventListener("input", function (e) { setLevel(1, +e.target.value); });
+    $("xfader").addEventListener("input", function (e) { setCross(+e.target.value); });
+    setCross(50);
+
+    window.addEventListener("keydown", function (ev) {
+      const k = ev.key;
+      if (k >= "1" && k <= "5") {
+        const st = decks[0].stems[+k - 1];
+        if (st) { toggleStem(decks[0], st); ev.preventDefault(); }
+      } else if (k >= "6" && k <= "9") {
+        const st = decks[1].stems[+k - 6];
+        if (st) { toggleStem(decks[1], st); ev.preventDefault(); }
+      } else if (k === "0") {
+        const st = decks[1].stems[4];
+        if (st) { toggleStem(decks[1], st); ev.preventDefault(); }
+      } else if (k === " ") {
+        ev.preventDefault();
+        $("playBtn").click();
+      } else if (k === "ArrowLeft") {
+        ev.preventDefault();
+        const el = $("xfader"); el.value = Math.max(0, +el.value - 4); setCross(+el.value);
+      } else if (k === "ArrowRight") {
+        ev.preventDefault();
+        const el = $("xfader"); el.value = Math.min(100, +el.value + 4); setCross(+el.value);
+      } else if (k === "[") {
+        setBpm(bpm - 1);
+      } else if (k === "]") {
+        setBpm(bpm + 1);
+      }
+    });
+  }
+
+  function setFilter(i, v) {
+    const dk = decks[i];
+    if (!dk || !actx) return;
+    const f = 90 * Math.pow(24000 / 90, v / 100);
+    dk.filt.frequency.setTargetAtTime(f, actx.currentTime, 0.03);
+  }
+  function setLevel(i, v) {
+    const dk = decks[i];
+    if (!dk || !actx) return;
+    dk.gain.gain.setTargetAtTime(Math.pow(v / 100, 1.6), actx.currentTime, 0.03);
+  }
+  function setCross(v) {
+    const x = v / 100;
+    if (!actx || !decks.length) return;
+    decks[0].xf.gain.setTargetAtTime(Math.cos(x * Math.PI / 2), actx.currentTime, 0.03);
+    decks[1].xf.gain.setTargetAtTime(Math.sin(x * Math.PI / 2), actx.currentTime, 0.03);
+  }
+
+  /* ================= 启动 ================= */
+  $("bootBtn").addEventListener("click", function () {
+    const btn = this;
+    btn.textContent = "合成中…";
+    setTimeout(function () {
+      buildAudio();
+      buildPads();
+      wire();
+      $("boot").classList.add("hide");
+      actx.resume();
+      // 默认先给个能听的底：A 盘鼓组 + 贝斯
+      toggleStem(decks[0], decks[0].stems[0]);
+      toggleStem(decks[0], decks[0].stems[2]);
+      toggleStem(decks[0], decks[0].stems[3]);
+      startPlayback();
+      loop();
+    }, 30);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网址即存档 · 关卡编解码</title>
+<style>
+  html,body{margin:0;min-height:100%;background:#080a0e;color:#c9d6e4;
+    font-family:ui-monospace,"SFMono-Regular",Consolas,monospace;-webkit-user-select:none;user-select:none}
+  #app{max-width:1080px;margin:0 auto;padding:18px 16px 40px}
+  h1{margin:0 0 4px;font-size:15px;letter-spacing:.22em;font-weight:600;color:#e8f2fb}
+  .sub{font-size:11px;color:#5a6d80;letter-spacing:.08em;margin-bottom:14px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .toolbar .sep{width:1px;height:22px;background:#1b2532;margin:0 6px}
+  button{font:inherit;font-size:11.5px;background:#0d141c;color:#9db1c5;border:1px solid #1c2733;
+    padding:7px 11px;cursor:pointer;letter-spacing:.06em}
+  button:hover{border-color:#2f4459;color:#e2f0ff}
+  button.active{background:#123043;border-color:#2d6f96;color:#c8f0ff}
+  button.primary{background:#12303a;border-color:#2b6f6a;color:#b9fff0}
+  canvas{display:block;width:100%;height:auto;background:#0a0f15;border:1px solid #16202b;cursor:crosshair;touch-action:none}
+  #urlbar{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  #url{flex:1;min-width:240px;font:inherit;font-size:11px;background:#0a0f15;border:1px solid #1c2733;
+    color:#7fa3c0;padding:8px 10px;outline:none}
+  #url:focus{border-color:#2d6f96}
+  #len{font-size:11px;color:#5a6d80;white-space:nowrap}
+  #len.warn{color:#ffb84d}
+  #len.bad{color:#ff6b6b}
+  #status{font-size:11px;color:#4f6273;margin-top:8px;min-height:16px;letter-spacing:.06em}
+  #status b{color:#7fe6c0;font-weight:400}
+  .hint{font-size:11px;color:#4a5b6c;margin-top:16px;line-height:1.9}
+  .hint b{color:#8ba1b6;font-weight:400}
+  #overlay{position:fixed;inset:0;display:none;place-items:center;pointer-events:none;z-index:20}
+  #overlay.show{display:grid}
+  #overlay .c{background:#081018ee;border:1px solid #2b6f6a;padding:20px 34px;text-align:center;
+    pointer-events:auto;box-shadow:0 0 50px #14ffa922}
+  #overlay h2{margin:0 0 4px;font-size:17px;color:#7fe6c0;letter-spacing:.14em;font-weight:600}
+  #overlay p{margin:0 0 12px;font-size:11.5px;color:#7c93a8}
+  #overlay button{background:#0f2a26;border-color:#2b6f6a;color:#a9ffe4}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>网址即存档</h1>
+  <div class="sub">整张关卡压进 URL 的 hash 里 · 分享链接 = 分享关卡</div>
+
+  <div class="toolbar">
+    <button data-tool="1" class="active">1 地面</button>
+    <button data-tool="2">2 尖刺</button>
+    <button data-tool="3">3 金币</button>
+    <button data-tool="4">4 出生点</button>
+    <button data-tool="5">5 出口</button>
+    <span class="sep"></span>
+    <button id="playBtn" class="primary">▶ 试玩 (E)</button>
+    <button id="clearBtn">清空</button>
+    <button id="demoBtn">示例关卡</button>
+    <span class="sep"></span>
+    <button id="copyBtn">复制链接 (C)</button>
+    <button id="pasteBtn">从剪贴板载入</button>
+  </div>
+
+  <canvas id="cv" width="1024" height="544"></canvas>
+
+  <div id="urlbar">
+    <input id="url" readonly spellcheck="false">
+    <span id="len">0 字符</span>
+  </div>
+  <div id="status"></div>
+
+  <div class="hint">
+    <b>左键画 / 右键擦</b> · <b>1–5</b> 换笔刷 · <b>E</b> 试玩 · <b>R</b> 重开 · <b>C</b> 复制链接<br>
+    状态 → 紧凑 JSON → <b>CompressionStream('deflate-raw')</b> → base64url → 直接写进 <b>location.hash</b>，
+    不刷新页面、不请求服务器。链接长度会实时显示：超过 2000 字符就该考虑换短码了。
+  </div>
+</div>
+
+<div id="overlay"><div class="c"><h2 id="ovTitle">通关</h2><p id="ovDesc"></p><button id="ovBtn">回到编辑</button></div></div>
+
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const COLS = 32, ROWS = 17, CS = 32;
+  const W = COLS * CS, H = ROWS * CS;
+
+  const T = { EMPTY: 0, GROUND: 1, SPIKE: 2, COIN: 3, SPAWN: 4, EXIT: 5 };
+
+  let grid = new Uint8Array(COLS * ROWS);
+  let tool = T.GROUND;
+  let mode = "edit";          // edit | play
+  let P = null;
+  let coinsTotal = 0, coinsGot = 0;
+  let startTime = 0, elapsed = 0, deathP = 0;
+  let won = false;
+  let painting = 0;           // 0 none, 1 paint, 2 erase
+  let lastCell = { x: -1, y: -1 };
+  let editGrid = null;        // 试玩前的关卡备份（金币被吃掉不影响存档）
+  let lastPack = "";
+  let packTimer = 0;
+
+  const $ = function (id) { return document.getElementById(id); };
+
+  /* ================= 关卡数据 ================= */
+  function idx(x, y) { return y * COLS + x; }
+  function get(x, y) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return T.EMPTY;
+    return grid[idx(x, y)];
+  }
+  function set(x, y, v) {
+    if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
+    grid[idx(x, y)] = v;
+  }
+  function solidAt(x, y) {
+    if (x < 0 || x >= COLS) return true;
+    if (y < 0) return false;
+    if (y >= ROWS) return false;
+    return grid[idx(x, y)] === T.GROUND;
+  }
+
+  function blank() { grid = new Uint8Array(COLS * ROWS); }
+
+  function demo() {
+    blank();
+    for (let x = 0; x < COLS; x++) { set(x, 15, T.GROUND); set(x, 16, T.GROUND); }
+    for (let x = 6; x <= 11; x++) set(x, 12, T.GROUND);
+    for (let x = 14; x <= 19; x++) set(x, 9, T.GROUND);
+    for (let x = 22; x <= 29; x++) set(x, 12, T.GROUND);
+    set(13, 14, T.SPIKE);
+    set(20, 14, T.SPIKE);
+    set(8, 11, T.COIN); set(9, 11, T.COIN);
+    set(16, 8, T.COIN); set(17, 8, T.COIN);
+    set(25, 11, T.COIN);
+    set(2, 14, T.SPAWN);
+    set(27, 11, T.EXIT);
+  }
+
+  function clearAll() { blank(); set(2, 14, T.SPAWN); set(28, 14, T.EXIT); }
+
+  /* ================= 编解码 ================= */
+  function rle() {
+    let out = "", run = grid[0], n = 1;
+    for (let i = 1; i < grid.length; i++) {
+      if (grid[i] === run) { n++; }
+      else { out += run.toString(36) + n.toString(36) + ","; run = grid[i]; n = 1; }
+    }
+    out += run.toString(36) + n.toString(36);
+    return out;
+  }
+  function unrle(s) {
+    const g = new Uint8Array(COLS * ROWS);
+    let p = 0;
+    for (const part of s.split(",")) {
+      if (!part) continue;
+      const v = parseInt(part[0], 36);
+      const n = parseInt(part.slice(1), 36);
+      if (!isFinite(v) || !isFinite(n)) throw new Error("bad RLE");
+      for (let i = 0; i < n && p < g.length; i++) g[p++] = v;
+    }
+    if (p !== g.length) throw new Error("length " + p);
+    return g;
+  }
+
+  function b64url(bytes) {
+    let s = "";
+    const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    }
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function unb64url(str) {
+    let s = str.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  async function pack() {
+    const payload = JSON.stringify({ v: 1, d: rle() });
+    const bytes = new TextEncoder().encode(payload);
+    let tag = "j", out;
+    if (typeof CompressionStream === "function") {
+      try {
+        const cs = new CompressionStream("deflate-raw");
+        const ab = await new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer();
+        tag = "z";
+        out = new Uint8Array(ab);
+      } catch (e) {
+        out = bytes;
+      }
+    } else {
+      out = bytes;
+    }
+    return tag + b64url(out);
+  }
+
+  async function unpack(str) {
+    const tag = str[0];
+    const bytes = unb64url(str.slice(1));
+    let raw;
+    if (tag === "z") {
+      const ds = new DecompressionStream("deflate-raw");
+      const ab = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+      raw = new Uint8Array(ab);
+    } else if (tag === "j") {
+      raw = bytes;
+    } else {
+      throw new Error("unknown tag");
+    }
+    const obj = JSON.parse(new TextDecoder().decode(raw));
+    if (!obj || obj.v !== 1 || typeof obj.d !== "string") throw new Error("bad payload");
+    return unrle(obj.d);
+  }
+
+  function syncURL() {
+    clearTimeout(packTimer);
+    packTimer = setTimeout(async function () {
+      try {
+        const code = await pack();
+        lastPack = code;
+        const u = location.href.split("#")[0] + "#" + code;
+        $("url").value = u;
+        $("len").textContent = u.length + " 字符";
+        $("len").className = u.length > 2000 ? "warn" : "";
+        try { history.replaceState(null, "", "#" + code); } catch (e) { /* file:// 也能用 */ }
+      } catch (e) {
+        setStatus("打包失败：" + e.message);
+      }
+    }, 90);
+  }
+
+  function setStatus(html) { $("status").innerHTML = html; }
+
+  /* ================= 渲染 ================= */
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // 背景网格
+    ctx.fillStyle = "#0a0f15";
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "rgba(60,100,140,.08)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= COLS; x++) {
+      ctx.beginPath(); ctx.moveTo(x * CS + .5, 0); ctx.lineTo(x * CS + .5, H); ctx.stroke();
+    }
+    for (let y = 0; y <= ROWS; y++) {
+      ctx.beginPath(); ctx.moveTo(0, y * CS + .5); ctx.lineTo(W, y * CS + .5); ctx.stroke();
+    }
+
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const v = grid[idx(x, y)];
+        if (!v) continue;
+        const px = x * CS, py = y * CS;
+        if (v === T.GROUND) {
+          ctx.fillStyle = "#243447";
+          ctx.fillRect(px, py, CS, CS);
+          ctx.fillStyle = "#33506b";
+          ctx.fillRect(px, py, CS, 4);
+          ctx.fillStyle = "rgba(0,0,0,.22)";
+          ctx.fillRect(px, py + CS - 3, CS, 3);
+        } else if (v === T.SPIKE) {
+          ctx.fillStyle = "#ff5d6c";
+          for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            ctx.moveTo(px + i * 8, py + CS);
+            ctx.lineTo(px + i * 8 + 4, py + 8);
+            ctx.lineTo(px + i * 8 + 8, py + CS);
+            ctx.closePath();
+            ctx.fill();
+          }
+        } else if (v === T.COIN) {
+          ctx.beginPath();
+          ctx.arc(px + CS / 2, py + CS / 2, 8, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffd166";
+          ctx.fill();
+          ctx.strokeStyle = "#a97a12";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        } else if (v === T.SPAWN) {
+          ctx.fillStyle = "rgba(80,255,180,.16)";
+          ctx.fillRect(px + 3, py + 3, CS - 6, CS - 6);
+          ctx.fillStyle = "#5effc2";
+          ctx.beginPath();
+          ctx.moveTo(px + 11, py + 9);
+          ctx.lineTo(px + 22, py + 16);
+          ctx.lineTo(px + 11, py + 23);
+          ctx.closePath();
+          ctx.fill();
+        } else if (v === T.EXIT) {
+          ctx.fillStyle = "rgba(120,180,255,.18)";
+          ctx.fillRect(px + 3, py + 3, CS - 6, CS - 6);
+          ctx.strokeStyle = "#7fb0ff";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(px + 7, py + 7, CS - 14, CS - 14);
+          ctx.fillStyle = "#7fb0ff";
+          ctx.fillRect(px + CS - 12, py + CS / 2 - 2, 3, 4);
+        }
+      }
+    }
+
+    if (mode === "play" && P) {
+      // 玩家
+      ctx.fillStyle = deathP > 0 ? "#ff6b6b" : "#eaf4ff";
+      const r = 5;
+      roundRect(P.x, P.y, P.w, P.h, r);
+      ctx.fill();
+      ctx.fillStyle = "#16222e";
+      ctx.fillRect(P.x + 5, P.y + 8, 3, 3);
+      ctx.fillRect(P.x + P.w - 8, P.y + 8, 3, 3);
+
+      // 计时
+      ctx.fillStyle = "rgba(8,14,20,.82)";
+      ctx.fillRect(W - 132, 10, 122, 30);
+      ctx.fillStyle = "#9fc4dd";
+      ctx.font = "14px ui-monospace,monospace";
+      ctx.textAlign = "right";
+      ctx.fillText(elapsed.toFixed(2) + "s", W - 20, 31);
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#7fb0ff";
+      ctx.fillText("★ " + coinsGot + "/" + coinsTotal, 18, 31);
+    }
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* ================= 试玩 ================= */
+  function startPlay() {
+    let sx = 2, sy = 14, found = false;
+    coinsTotal = 0; coinsGot = 0;
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const v = grid[idx(x, y)];
+        if (v === T.SPAWN) { sx = x; sy = y; found = true; }
+        if (v === T.COIN) coinsTotal++;
+      }
+    }
+    if (!found) { setStatus("<b>没有出生点</b> · 先用 4 号笔刷放一个"); return; }
+    P = { x: sx * CS + 6, y: sy * CS + 6, w: 20, h: 26, vx: 0, vy: 0, ground: false, jumps: 0 };
+    editGrid = grid.slice();
+    mode = "play";
+    won = false;
+    deathP = 0;
+    startTime = performance.now();
+    elapsed = 0;
+    $("playBtn").textContent = "■ 停止 (E)";
+    setStatus("试玩中 · <b>← →</b> 移动 · <b>空格</b> 跳 · <b>R</b> 重开 · <b>E</b> 回编辑");
+  }
+
+  function stopPlay() {
+    mode = "edit";
+    P = null;
+    if (editGrid) { grid = editGrid; editGrid = null; }
+    syncURL();
+    $("playBtn").textContent = "▶ 试玩 (E)";
+    $("overlay").classList.remove("show");
+    setStatus("编辑模式 · 改动会自动重新打包进 URL");
+  }
+
+  function respawnPlayer() {
+    let sx = 2, sy = 14;
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (grid[idx(x, y)] === T.SPAWN) { sx = x; sy = y; }
+      }
+    }
+    P.x = sx * CS + 6; P.y = sy * CS + 6; P.vx = 0; P.vy = 0;
+    startTime = performance.now();
+    coinsGot = 0;
+    deathP = 0.35;
+  }
+
+  const keys = Object.create(null);
+
+  function physics(dt) {
+    if (!P) return;
+    let ax = 0;
+    if (keys["arrowleft"] || keys["a"]) ax -= 1;
+    if (keys["arrowright"] || keys["d"]) ax += 1;
+    const accel = P.ground ? 2400 : 1500;
+    if (ax) {
+      P.vx += ax * accel * dt;
+      if (Math.abs(P.vx) > 320) P.vx = Math.sign(P.vx) * 320;
+    } else {
+      const fr = P.ground ? 2400 : 380;
+      if (Math.abs(P.vx) < fr * dt) P.vx = 0;
+      else P.vx -= Math.sign(P.vx) * fr * dt;
+    }
+    P.vy += 2100 * dt;
+    if (P.vy > 1300) P.vy = 1300;
+
+    // X
+    P.x += P.vx * dt;
+    {
+      const r0 = Math.floor(P.y / CS), r1 = Math.floor((P.y + P.h - 1) / CS);
+      if (P.vx > 0) {
+        const c = Math.floor((P.x + P.w - 1) / CS);
+        for (let r = r0; r <= r1; r++) if (solidAt(c, r)) { P.x = c * CS - P.w; P.vx = 0; break; }
+      } else if (P.vx < 0) {
+        const c = Math.floor(P.x / CS);
+        for (let r = r0; r <= r1; r++) if (solidAt(c, r)) { P.x = (c + 1) * CS; P.vx = 0; break; }
+      }
+    }
+
+    // Y
+    P.y += P.vy * dt;
+    P.ground = false;
+    {
+      const c0 = Math.floor(P.x / CS), c1 = Math.floor((P.x + P.w - 1) / CS);
+      if (P.vy > 0) {
+        const r = Math.floor((P.y + P.h - 1) / CS);
+        for (let c = c0; c <= c1; c++) if (solidAt(c, r)) { P.y = r * CS - P.h; P.vy = 0; P.ground = true; P.jumps = 0; break; }
+      } else if (P.vy < 0) {
+        const r = Math.floor(P.y / CS);
+        for (let c = c0; c <= c1; c++) if (solidAt(c, r)) { P.y = (r + 1) * CS; P.vy = 40; break; }
+      }
+    }
+
+    // 掉出画面
+    if (P.y > H + 80) { respawnPlayer(); }
+
+    // 瓦片事件
+    const c0 = Math.max(0, Math.floor(P.x / CS)), c1 = Math.min(COLS - 1, Math.floor((P.x + P.w - 1) / CS));
+    const r0 = Math.max(0, Math.floor(P.y / CS)), r1 = Math.min(ROWS - 1, Math.floor((P.y + P.h - 1) / CS));
+    for (let y = r0; y <= r1; y++) {
+      for (let x = c0; x <= c1; x++) {
+        const v = grid[idx(x, y)];
+        if (v === T.COIN) {
+          grid[idx(x, y)] = T.EMPTY;
+          coinsGot++;
+          deathP = 0;
+        } else if (v === T.SPIKE) {
+          respawnPlayer();
+          return;
+        } else if (v === T.EXIT && coinsGot >= coinsTotal) {
+          finish();
+          return;
+        }
+      }
+    }
+  }
+
+  let finishTimer = 0;
+  function finish() {
+    won = true;
+    const t = elapsed.toFixed(2);
+    const key = "urlgame:" + location.hash;
+    let best = 0;
+    try { best = parseFloat(localStorage.getItem(key) || "0"); } catch (e) { best = 0; }
+    let better = false;
+    if (!best || elapsed < best) {
+      best = elapsed;
+      better = true;
+      try { localStorage.setItem(key, String(elapsed)); } catch (e) { /* noop */ }
+    }
+    $("ovTitle").textContent = "通关";
+    $("ovDesc").innerHTML = "用时 " + t + " 秒" + (better ? " · 新纪录" : " · 最佳 " + best.toFixed(2) + " 秒") +
+      "<br>这条链接的纪录存在你自己的浏览器里";
+    $("overlay").classList.add("show");
+    setStatus("通关 · 用时 <b>" + t + "s</b>");
+    clearTimeout(finishTimer);
+    finishTimer = setTimeout(function () { $("overlay").classList.remove("show"); }, 4000);
+  }
+
+  /* ================= 输入 ================= */
+  function cellFromEvent(e) {
+    const r = cv.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) * (W / r.width) / CS);
+    const y = Math.floor((e.clientY - r.top) * (H / r.height) / CS);
+    return { x: x, y: y };
+  }
+
+  function paintCell(cx, cy) {
+    if (cx < 0 || cy < 0 || cx >= COLS || cy >= ROWS) return;
+    if (tool === T.SPAWN) {
+      for (let i = 0; i < grid.length; i++) if (grid[i] === T.SPAWN) grid[i] = T.EMPTY;
+    }
+    if (tool === T.EXIT) {
+      for (let i = 0; i < grid.length; i++) if (grid[i] === T.EXIT) grid[i] = T.EMPTY;
+    }
+    set(cx, cy, painting === 2 ? T.EMPTY : tool);
+    syncURL();
+  }
+
+  cv.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  cv.addEventListener("pointerdown", function (e) {
+    if (mode === "play") return;
+    painting = e.button === 2 ? 2 : 1;
+    const c = cellFromEvent(e);
+    lastCell = c;
+    paintCell(c.x, c.y);
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!painting || mode === "play") return;
+    const c = cellFromEvent(e);
+    if (c.x < 0 || c.y < 0 || c.x >= COLS || c.y >= ROWS) return;
+    if (lastCell.x === c.x && lastCell.y === c.y) return;
+    lastCell = c;
+    paintCell(c.x, c.y);
+  });
+  cv.addEventListener("pointerup", function () { painting = 0; });
+  cv.addEventListener("pointercancel", function () { painting = 0; });
+
+  window.addEventListener("keydown", function (e) {
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (k === " " || k === "arrowup" || k === "arrowdown") e.preventDefault();
+    if (mode === "play") {
+      if ((k === " " || k === "arrowup" || k === "w") && !keys["__j"]) {
+        keys["__j"] = true;
+        if (P.ground) { P.vy = -720; P.ground = false; P.jumps = 1; }
+        else if (P.jumps < 2) { P.vy = -660; P.jumps = 2; }
+      }
+      if (k === "r") respawnPlayer();
+      if (k === "e") stopPlay();
+      return;
+    }
+    if (k >= "1" && k <= "5") selectTool(+k);
+    if (k === "e") startPlay();
+    if (k === "c") copyURL();
+  });
+  window.addEventListener("keyup", function (e) {
+    const k = e.key.toLowerCase();
+    keys[k] = false;
+    if (k === " " || k === "arrowup" || k === "w") keys["__j"] = false;
+  });
+  window.addEventListener("blur", function () { for (const k in keys) keys[k] = false; });
+
+  function selectTool(t) {
+    tool = t;
+    document.querySelectorAll("[data-tool]").forEach(function (b) {
+      b.classList.toggle("active", +b.getAttribute("data-tool") === t);
+    });
+  }
+
+  function copyURL() {
+    const v = $("url").value;
+    if (!v) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(function () {
+        setStatus("<b>已复制</b> · 发给别人就能玩到这张图");
+      }).catch(function () { fallbackCopy(v); });
+    } else fallbackCopy(v);
+  }
+  function fallbackCopy(v) {
+    $("url").select();
+    try { document.execCommand("copy"); setStatus("<b>已复制</b>"); }
+    catch (e) { setStatus("请手动复制上面的链接"); }
+  }
+
+  /* ================= 主循环 ================= */
+  let last = 0, acc = 0;
+  const STEP = 1 / 120;
+  function frame(t) {
+    if (!last) last = t;
+    let dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+    if (mode === "play") {
+      acc += dt;
+      let guard = 0;
+      while (acc >= STEP && guard++ < 8) { physics(STEP); acc -= STEP; }
+      if (!won) elapsed = (performance.now() - startTime) / 1000;
+      if (deathP > 0) deathP -= dt;
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  /* ================= 启动 ================= */
+  async function boot() {
+    const hash = location.hash.replace(/^#/, "");
+    if (hash) {
+      try {
+        grid = await unpack(hash);
+        setStatus("已从 URL 载入关卡 · <b>" + hash.length + "</b> 字符");
+      } catch (e) {
+        demo();
+        setStatus("URL 里的关卡解不开（" + e.message + "），先给你一张示例");
+      }
+    } else {
+      demo();
+      setStatus("示例关卡已载入 · 改几笔看看 URL 怎么变");
+    }
+    selectTool(T.GROUND);
+    syncURL();
+  }
+
+  $("playBtn").addEventListener("click", function () { mode === "play" ? stopPlay() : startPlay(); });
+  $("clearBtn").addEventListener("click", function () { clearAll(); syncURL(); });
+  $("demoBtn").addEventListener("click", function () { demo(); syncURL(); });
+  $("copyBtn").addEventListener("click", copyURL);
+  $("pasteBtn").addEventListener("click", async function () {
+    try {
+      const text = await navigator.clipboard.readText();
+      const m = text.match(/#(.+)$/);
+      const code = m ? m[1] : text.trim();
+      grid = await unpack(code);
+      stopPlay();
+      syncURL();
+      setStatus("<b>已从剪贴板载入</b>");
+    } catch (e) {
+      setStatus("读不到剪贴板：" + e.message);
+    }
+  });
+  $("ovBtn").addEventListener("click", stopPlay);
+  document.querySelectorAll("[data-tool]").forEach(function (b) {
+    b.addEventListener("click", function () { selectTool(+b.getAttribute("data-tool")); });
+  });
+
+  boot();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

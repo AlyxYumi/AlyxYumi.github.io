@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>这个网页就是地图 · DOM 平台跳跃</title>
+<style>
+  :root{--ink:#0e1116;--line:#e3e6ea;--accent:#3b5bff}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#f6f7f9;color:var(--ink);
+    font-family:ui-sans-serif,system-ui,"Segoe UI","Noto Sans SC",sans-serif;
+    overflow-x:hidden}
+  body{position:relative}
+  #player{position:absolute;left:0;top:0;width:24px;height:24px;z-index:9;
+    will-change:transform;pointer-events:none}
+  #player .body{width:24px;height:24px;border-radius:7px;
+    background:radial-gradient(circle at 35% 30%,#fff,#3b5bff 55%,#15268f);
+    box-shadow:0 6px 16px rgba(59,91,255,.45);position:relative}
+  #player .body:before,#player .body:after{content:"";position:absolute;top:9px;width:3px;height:3px;
+    border-radius:50%;background:#fff}
+  #player .body:before{left:7px}
+  #player .body:after{left:14px}
+  #player.ground .body{transform:scaleY(.92) scaleX(1.06)}
+
+  nav{display:flex;align-items:center;gap:26px;height:64px;padding:0 28px;
+    background:#fff;border-bottom:1px solid var(--line)}
+  nav .logo{font-weight:800;letter-spacing:.14em;font-size:14px}
+  nav a{font-size:13px;color:#59606b;text-decoration:none;padding:8px 12px;border-radius:8px}
+  nav a:hover{background:#eef1f6;color:var(--ink)}
+  nav .spacer{flex:1}
+  nav .pill{font-size:12px;padding:7px 14px;border-radius:999px;background:var(--ink);color:#fff}
+
+  .hero{height:260px;padding:34px 28px 0;max-width:1080px;margin:0 auto;position:relative}
+  .hero h1{margin:0;font-size:44px;line-height:1.12;letter-spacing:-.02em}
+  .hero p{margin:12px 0 0;color:#69707c;font-size:14px;max-width:460px;line-height:1.7}
+  .cta{display:flex;gap:12px;margin-top:22px}
+  .cta button{font:inherit;font-size:13px;padding:11px 20px;border-radius:10px;border:1px solid var(--ink);
+    background:var(--ink);color:#fff;cursor:pointer}
+  .cta button.ghost{background:#fff;color:var(--ink)}
+  .cta button:active{transform:translateY(1px)}
+
+  .chips{height:60px;display:flex;gap:10px;align-items:center;padding:0 28px;max-width:1080px;margin:0 auto}
+  .chip{font-size:12px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;color:#4c5360}
+
+  .cards{height:240px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+    max-width:1080px;margin:0 auto;padding:0 28px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;
+    box-shadow:0 1px 0 #0000000a}
+  .card h3{margin:0 0 8px;font-size:15px}
+  .card p{margin:0;font-size:12.5px;color:#6b727e;line-height:1.7}
+  .card .k{font-size:26px;font-weight:800;letter-spacing:-.03em;margin-bottom:6px}
+
+  .marquee{height:80px;display:flex;align-items:center;gap:14px;overflow:hidden;
+    background:#0e1116;color:#8b93a3;font-size:13px;padding:0 28px;white-space:nowrap}
+  .marquee b{color:#fff;font-weight:600}
+
+  .banner{height:180px;display:flex;align-items:center;justify-content:center;gap:20px;
+    max-width:1080px;margin:0 auto}
+  .banner .box{flex:1;height:110px;border-radius:16px;background:#fff;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:13px;color:#5c6470}
+
+  footer{height:300px;background:#0e1116;color:#8b93a3;padding:40px 28px;font-size:12px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+  footer h4{color:#fff;font-size:12px;margin:0 0 10px;letter-spacing:.12em}
+  footer div.line{margin-bottom:7px}
+
+  .star{position:absolute;width:26px;height:26px;font-size:22px;line-height:26px;text-align:center;
+    color:#ffb300;text-shadow:0 0 14px #ffb30099;z-index:8;animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-6px) rotate(8deg)}}
+
+  #hud{position:fixed;top:12px;right:14px;z-index:30;display:flex;gap:10px;align-items:center;
+    background:#ffffffd9;backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;
+    padding:8px 14px;font-size:12px;color:#4c5360;pointer-events:none}
+  #hud b{color:#0e1116;font-size:14px}
+  #tip{position:fixed;left:14px;bottom:12px;z-index:30;font-size:11.5px;color:#8b929e;
+    background:#ffffffcc;border:1px solid var(--line);border-radius:10px;padding:7px 12px;pointer-events:none}
+  #toast{position:fixed;left:50%;top:20%;transform:translate(-50%,-10px);z-index:40;
+    background:#0e1116;color:#fff;padding:16px 30px;border-radius:14px;font-size:14px;
+    opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;text-align:center}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #toast small{display:block;font-size:11px;color:#8b93a3;margin-top:6px}
+</style>
+</head>
+<body>
+<div id="player"><div class="body"></div></div>
+
+<nav data-solid>
+  <span class="logo">LATTICE</span>
+  <a href="#" data-solid onclick="return false">产品</a>
+  <a href="#" data-solid onclick="return false">文档</a>
+  <a href="#" data-solid onclick="return false">定价</a>
+  <span class="spacer"></span>
+  <span class="pill" data-solid>开始使用</span>
+</nav>
+
+<section class="hero">
+  <h1>这个网页<br>就是地图。</h1>
+  <p>你操控的小方块踩在真实的 DOM 元素上。每个可点的东西都是地面，<code>getBoundingClientRect()</code> 就是碰撞盒。</p>
+  <div class="cta">
+    <button data-solid data-act="lowg">切到低重力</button>
+    <button class="ghost" data-solid data-act="super">再加一点跳力</button>
+  </div>
+</section>
+
+<div class="chips">
+  <span class="chip" data-solid>v1.0.0</span>
+  <span class="chip" data-solid>零依赖</span>
+  <span class="chip" data-solid>6 KB</span>
+  <span class="chip" data-solid>纯 CSS 物理外壳</span>
+</div>
+
+<section class="cards">
+  <article class="card" data-solid>
+    <div class="k">24h</div>
+    <h3>从想法到能玩</h3>
+    <p>没有资源管线，没有构建设计，一个 HTML 文件就是全部交付物。</p>
+  </article>
+  <article class="card" data-solid>
+    <div class="k">0</div>
+    <h3>素材依赖</h3>
+    <p>贴图是渐变，音效是振荡器，地图是别人的网页。</p>
+  </article>
+  <article class="card" data-solid>
+    <div class="k">∞</div>
+    <h3>关卡数量</h3>
+    <p>改一版 CSS，关卡就变了 —— 这是最便宜的关卡生成器。</p>
+  </article>
+</section>
+
+<div class="marquee">
+  <b>把任何网页变成平台跳跃</b><span>·</span><span>DOM 即碰撞体</span><span>·</span><span>scrollY 即摄像机</span><span>·</span><span>点按钮是真的能点</span>
+</div>
+
+<div class="banner">
+  <div class="box" data-solid>左侧平台</div>
+  <div class="box" data-solid>右侧平台</div>
+</div>
+
+<footer data-solid>
+  <div><h4>LATTICE</h4><div class="line">用界面本身当玩法</div></div>
+  <div><h4>产品</h4><div class="line">编辑器</div><div class="line">运行时</div></div>
+  <div><h4>资源</h4><div class="line">文档</div><div class="line">示例</div></div>
+  <div><h4>联系</h4><div class="line">hi@lattice.dev</div></div>
+</footer>
+
+<div id="hud">星星 <b id="score">0</b> / 5</div>
+<div id="tip">← → 移动 · 空格 / ↑ 跳跃（可二段跳）· R 回到起点</div>
+<div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  const playerEl = document.getElementById("player");
+  const scoreEl = document.getElementById("score");
+  const toast = document.getElementById("toast");
+
+  const P = { x: 80, y: 0, w: 24, h: 24, vx: 0, vy: 0, ground: false, jumps: 0 };
+  let gravity = 2000;
+  let jumpPower = 1000;
+  let stars = [];
+  let collected = 0;
+  let spawn = { x: 80, y: 0 };
+  let solidsCache = [];
+  let cacheTick = 0;
+
+  const keys = Object.create(null);
+
+  /* ================= 收集物 ================= */
+  function placeStars() {
+    for (const s of stars) s.el.remove();
+    stars = [];
+    const refs = [
+      { sel: "nav", dx: 0.72, dy: 36 },
+      { sel: ".cta button", dx: 0.5, dy: -34 },
+      { sel: ".cards .card:nth-child(1)", dx: 0.5, dy: -36 },
+      { sel: ".cards .card:nth-child(2)", dx: 0.5, dy: -36 },
+      { sel: ".cards .card:nth-child(3)", dx: 0.5, dy: -36 }
+    ];
+    for (const r of refs) {
+      const el = document.querySelector(r.sel);
+      if (!el) continue;
+      const b = el.getBoundingClientRect();
+      const x = b.left + window.scrollX + b.width * r.dx - 13;
+      const y = b.top + window.scrollY + r.dy - 10;
+      const d = document.createElement("div");
+      d.className = "star";
+      d.textContent = "★";
+      d.style.transform = "translate(" + x + "px," + y + "px)";
+      // 用 left/top 而不是 transform，避免和动画冲突
+      d.style.left = x + "px";
+      d.style.top = y + "px";
+      d.style.transform = "";
+      document.body.appendChild(d);
+      stars.push({ x: x + 13, y: y + 13, r: 15, el: d, got: false });
+    }
+  }
+
+  /* ================= 碰撞体 ================= */
+  function collectSolids() {
+    const out = [];
+    const els = document.querySelectorAll("[data-solid]");
+    for (let i = 0; i < els.length; i++) {
+      const b = els[i].getBoundingClientRect();
+      if (b.width < 2 || b.height < 2) continue;
+      out.push({
+        x: b.left + window.scrollX,
+        y: b.top + window.scrollY,
+        w: b.width,
+        h: b.height
+      });
+    }
+    return out;
+  }
+
+  function overlaps(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  /* ================= 出生点 ================= */
+  function respawn() {
+    const foot = document.querySelector("footer");
+    const b = foot.getBoundingClientRect();
+    spawn = {
+      x: b.left + window.scrollX + 60,
+      y: b.top + window.scrollY - P.h - 2
+    };
+    P.x = spawn.x; P.y = spawn.y; P.vx = 0; P.vy = 0;
+  }
+
+  /* ================= 物理 ================= */
+  function physics(dt) {
+    if (cacheTick-- <= 0) {
+      solidsCache = collectSolids();
+      cacheTick = 6;
+    }
+    const solids = solidsCache;
+
+    let ax = 0;
+    if (keys["arrowleft"] || keys["a"]) ax -= 1;
+    if (keys["arrowright"] || keys["d"]) ax += 1;
+    const target = ax * 330;
+    const accel = P.ground ? 2600 : 1500;
+    if (ax !== 0) {
+      P.vx += ax * accel * dt;
+      if (Math.abs(P.vx) > 330) P.vx = Math.sign(P.vx) * 330;
+    } else {
+      const fr = P.ground ? 2200 : 400;
+      if (Math.abs(P.vx) < fr * dt) P.vx = 0;
+      else P.vx -= Math.sign(P.vx) * fr * dt;
+    }
+
+    P.vy += gravity * dt;
+    if (P.vy > 1400) P.vy = 1400;
+
+    // 水平
+    P.x += P.vx * dt;
+    let box = { x: P.x, y: P.y, w: P.w, h: P.h };
+    for (const s of solids) {
+      if (!overlaps(box, s)) continue;
+      if (P.vx > 0) { P.x = s.x - P.w; P.vx = 0; }
+      else if (P.vx < 0) { P.x = s.x + s.w; P.vx = 0; }
+      box.x = P.x;
+    }
+
+    // 垂直
+    P.y += P.vy * dt;
+    box = { x: P.x, y: P.y, w: P.w, h: P.h };
+    const wasGround = P.ground;
+    P.ground = false;
+    for (const s of solids) {
+      if (!overlaps(box, s)) continue;
+      if (P.vy > 0) {
+        P.y = s.y - P.h;
+        P.vy = 0;
+        P.ground = true;
+      } else if (P.vy < 0) {
+        P.y = s.y + s.h;
+        P.vy = 30;
+      }
+      box.y = P.y;
+    }
+    if (P.ground) P.jumps = 0;
+    else if (wasGround && P.vy > 0) P.jumps = 1; // 走下平台也算用掉一次
+
+    // 掉出世界
+    const docH = document.body.scrollHeight;
+    if (P.y > docH + 200) { respawn(); }
+
+    // 边界
+    if (P.x < 0) { P.x = 0; P.vx = 0; }
+    const maxX = Math.max(window.innerWidth, document.body.scrollWidth) - P.w;
+    if (P.x > maxX) { P.x = maxX; P.vx = 0; }
+  }
+
+  function jump() {
+    if (P.ground) {
+      P.vy = -jumpPower; P.ground = false; P.jumps = 1;
+    } else if (P.jumps < 2) {
+      P.vy = -jumpPower * 0.92;
+      P.jumps = 2;
+    }
+  }
+
+  /* ================= 表现 ================= */
+  function render() {
+    playerEl.style.transform = "translate(" + Math.round(P.x) + "px," + Math.round(P.y) + "px)";
+    playerEl.classList.toggle("ground", P.ground);
+
+    const vh = window.innerHeight;
+    let targetY = P.y + P.h / 2 - vh * 0.55;
+    const maxScroll = document.body.scrollHeight - vh;
+    targetY = Math.max(0, Math.min(maxScroll, targetY));
+    window.scrollTo(0, targetY);
+
+    for (const s of stars) {
+      if (s.got) continue;
+      if (Math.abs(P.x + P.w / 2 - s.x) < 26 && Math.abs(P.y + P.h / 2 - s.y) < 26) {
+        s.got = true;
+        s.el.style.transition = "transform .35s,opacity .35s";
+        s.el.style.transform = "scale(2.4)";
+        s.el.style.opacity = "0";
+        setTimeout(function () { s.el.remove(); }, 400);
+        collected++;
+        scoreEl.textContent = String(collected);
+        if (collected >= 5) win();
+      }
+    }
+  }
+
+  let winTimer = 0;
+  function win() {
+    toast.innerHTML = "全部收集完成。<small>按 R 重来 · 试试把窗口缩小，关卡会变形</small>";
+    toast.classList.add("show");
+    clearTimeout(winTimer);
+    winTimer = setTimeout(function () { toast.classList.remove("show"); }, 4200);
+  }
+  function say(msg) {
+    toast.innerHTML = msg;
+    toast.classList.add("show");
+    clearTimeout(winTimer);
+    winTimer = setTimeout(function () { toast.classList.remove("show"); }, 2200);
+  }
+
+  /* ================= 交互 ================= */
+  document.addEventListener("click", function (e) {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    e.preventDefault();
+    const act = btn.getAttribute("data-act");
+    if (act === "lowg") {
+      const low = gravity > 1200;
+      gravity = low ? 750 : 2000;
+      btn.textContent = low ? "切回正常重力" : "切到低重力";
+      say(low ? "低重力：现在能飘很久" : "正常重力");
+    } else if (act === "super") {
+      jumpPower = Math.min(1700, jumpPower + 180);
+      say("跳力 +180（当前 " + jumpPower + "）");
+    }
+  });
+
+  window.addEventListener("keydown", function (e) {
+    const k = e.key.toLowerCase();
+    keys[k] = true;
+    if (k === " " || k === "arrowup" || k === "w") {
+      e.preventDefault();
+      if (!keys["__jumpHeld"]) { keys["__jumpHeld"] = true; jump(); }
+    }
+    if (k === "arrowdown" || k === "s") e.preventDefault();
+    if (k === "r") {
+      respawn();
+      collected = 0;
+      scoreEl.textContent = "0";
+      for (const s of stars) { s.got = false; s.el.style.opacity = "1"; s.el.style.transform = ""; s.el.style.display = ""; }
+      placeStars();
+      collected = 0;
+      scoreEl.textContent = "0";
+      toast.classList.remove("show");
+    }
+  });
+  window.addEventListener("keyup", function (e) {
+    const k = e.key.toLowerCase();
+    keys[k] = false;
+    if (k === " " || k === "arrowup" || k === "w") keys["__jumpHeld"] = false;
+  });
+  window.addEventListener("blur", function () { for (const k in keys) keys[k] = false; });
+
+  /* ================= 启动 ================= */
+  function boot() {
+    respawn();
+    placeStars();
+    requestAnimationFrame(function () {
+      solidsCache = collectSolids();
+    });
+    say("踩在导航栏、按钮、卡片上试试<small>← → 移动 · 空格跳跃 · 可二段跳</small>");
+  }
+
+  let last = 0, acc = 0;
+  const STEP = 1 / 120;
+  function frame(t) {
+    if (!last) last = t;
+    let dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+    acc += dt;
+    let guard = 0;
+    while (acc >= STEP && guard++ < 8) { physics(STEP); acc -= STEP; }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener("resize", function () {
+    // 布局变了，星星要重新贴到元素上（已收集的保留状态）
+    const got = stars.map(s => s.got);
+    placeStars();
+    for (let i = 0; i < stars.length && i < got.length; i++) {
+      if (got[i]) { stars[i].got = true; stars[i].el.style.opacity = "0"; stars[i].el.style.display = "none"; }
+    }
+  });
+
+  boot();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

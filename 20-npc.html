@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>门房 · NPC 记得你的谎话</title>
+<style>
+  :root{--bg:#0a0908;--ink:#e6ddd0;--dim:#8a7f72;--line:#2a241e;--gold:#d8b26a;--red:#c8553d;--green:#6fbf8b}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:ui-serif,"Songti SC","Noto Serif SC",Georgia,serif}
+  body{display:grid;grid-template-columns:minmax(0,1fr) 380px;height:100vh;overflow:hidden}
+  @media(max-width:900px){body{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+
+  /* ---------- 左：场景 + 对话 ---------- */
+  #left{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line)}
+  #scene{position:relative;height:190px;flex:none;overflow:hidden;
+    background:linear-gradient(180deg,#141019,#0a0908 70%)}
+  #scene .moon{position:absolute;right:64px;top:22px;width:44px;height:44px;border-radius:50%;
+    background:radial-gradient(circle at 35% 35%,#fff8e2,#d8b26a 60%,#6b5528);
+    box-shadow:0 0 60px 18px #d8b26a22}
+  #gate{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:180px;height:150px;
+    border:2px solid #241d16;border-bottom:0;background:
+      repeating-linear-gradient(90deg,#1b1611 0 8px,#231c15 8px 16px)}
+  #gate:before,#gate:after{content:"";position:absolute;top:0;bottom:0;width:9px;background:#2d241b}
+  #gate:before{left:-4px}
+  #gate:after{right:-4px}
+  #guard{position:absolute;left:calc(50% + 118px);bottom:16px;width:26px;height:58px;
+    background:linear-gradient(180deg,#3a3026,#1d1812);border-radius:11px 11px 3px 3px}
+  #guard:before{content:"";position:absolute;left:7px;top:-13px;width:12px;height:13px;border-radius:50%;background:#4a3d30}
+  #guard:after{content:"";position:absolute;left:-6px;top:-6px;width:38px;height:6px;border-radius:4px;background:#2a2219}
+  #lantern{position:absolute;left:calc(50% - 128px);bottom:64px;width:16px;height:22px;border-radius:4px;
+    background:radial-gradient(circle,#ffd38a,#c8761a);box-shadow:0 0 44px 16px #ffb34733}
+  #scene .cap{position:absolute;left:20px;bottom:14px;font-size:12px;color:#6f6357;letter-spacing:.14em}
+
+  #log{flex:1;overflow-y:auto;padding:20px 24px;scroll-behavior:smooth}
+  .msg{margin-bottom:16px;max-width:92%;line-height:1.85;font-size:14.5px}
+  .msg.npc{color:#ddd2c2}
+  .msg.npc .who{font-size:11px;color:var(--gold);letter-spacing:.18em;margin-bottom:4px}
+  .msg.you{margin-left:auto;text-align:right;color:#a8b8c8}
+  .msg.you .who{font-size:11px;color:#5d6b7a;letter-spacing:.18em;margin-bottom:4px}
+  .msg.sys{max-width:100%;text-align:center;font-size:12px;color:#6d6154;letter-spacing:.08em;margin:14px 0;
+    border-top:1px solid #1d1813;border-bottom:1px solid #1d1813;padding:8px 0}
+  .msg.sys em{color:var(--gold);font-style:normal}
+
+  #composer{flex:none;border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:8px;background:#0c0b09}
+  #input{flex:1;background:#12100d;border:1px solid #2a241e;color:var(--ink);font:inherit;font-size:14px;
+    padding:11px 14px;outline:none}
+  #input:focus{border-color:#4a3d2c}
+  #send{font:inherit;font-size:13px;background:#221b13;border:1px solid #4a3d2c;color:var(--gold);
+    padding:0 20px;cursor:pointer;letter-spacing:.16em}
+  #send:hover{background:#2c2418}
+  #send:disabled{opacity:.4;cursor:default}
+
+  /* ---------- 右：状态 ---------- */
+  #right{display:flex;flex-direction:column;min-height:0;background:#0c0b09;overflow-y:auto}
+  .sec{padding:16px 18px;border-bottom:1px solid #1a1611}
+  .sec h3{margin:0 0 10px;font-size:11px;letter-spacing:.2em;color:#6d6154;font-weight:400}
+  .bar{margin-bottom:12px}
+  .bar .lab{display:flex;justify-content:space-between;font-size:11.5px;color:#8a7f72;margin-bottom:5px}
+  .bar .track{height:5px;background:#191512;border:1px solid #2a241e}
+  .bar .fill{height:100%;transition:width .3s}
+  #trustFill{background:linear-gradient(90deg,#3f7a5a,#6fbf8b)}
+  #suspFill{background:linear-gradient(90deg,#8a3a2e,#c8553d)}
+
+  .obj{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;color:#a89a89;
+    background:#100e0b;border:1px solid #241f18;padding:9px 11px;margin-bottom:6px;cursor:pointer;line-height:1.6}
+  .obj:hover{border-color:#4a3d2c;color:#e6ddd0}
+  .obj.done{color:#5a5147;border-color:#1a1611;text-decoration:line-through}
+  .obj .tag{color:var(--gold);font-size:11px;margin-right:4px}
+
+  #mem{font-size:12.5px;line-height:1.95;color:#9c8f7f;min-height:60px}
+  #mem .k{color:#5f564b}
+  #mem .v{color:var(--gold)}
+  #mem .bad{color:var(--red)}
+  #mem .ok{color:var(--green)}
+
+  details{border:1px solid #1a1611;padding:10px 12px;margin-top:4px}
+  details summary{cursor:pointer;font-size:11.5px;color:#6d6154;letter-spacing:.1em;outline:none}
+  details[open] summary{color:var(--gold);margin-bottom:10px}
+  details input{width:100%;font:inherit;font-size:11.5px;background:#12100d;border:1px solid #2a241e;
+    color:#b6a897;padding:6px 8px;margin-bottom:6px;outline:none}
+  details label{font-size:11px;color:#6d6154;display:flex;gap:6px;align-items:center;margin-top:4px}
+  details button{font:inherit;font-size:11px;background:#1a1611;border:1px solid #3a3128;color:#a89a89;
+    padding:5px 10px;cursor:pointer;margin-top:6px}
+  #resetBtn{width:100%;font:inherit;font-size:12px;background:#14110d;border:1px solid #2a241e;
+    color:#7d7264;padding:9px;cursor:pointer;letter-spacing:.14em}
+  #resetBtn:hover{border-color:var(--red);color:var(--red)}
+</style>
+</head>
+<body>
+<div id="left">
+  <div id="scene">
+    <div class="moon"></div>
+    <div id="gate"></div>
+    <div id="guard"></div>
+    <div id="lantern"></div>
+    <div class="cap">王宫北门 · 子时三刻</div>
+  </div>
+  <div id="log"></div>
+  <div id="composer">
+    <input id="input" autocomplete="off" spellcheck="false" placeholder="对老王说点什么……（例：我是信使 / 给你酒 / 口令是夜枭）">
+    <button id="send">说</button>
+  </div>
+</div>
+
+<div id="right">
+  <div class="sec">
+    <h3>老王的判断</h3>
+    <div class="bar">
+      <div class="lab"><span>信任 TRUST</span><span id="trustTxt">12</span></div>
+      <div class="track"><div class="fill" id="trustFill" style="width:12%"></div></div>
+    </div>
+    <div class="bar">
+      <div class="lab"><span>怀疑 SUSPICION</span><span id="suspTxt">8</span></div>
+      <div class="track"><div class="fill" id="suspFill" style="width:8%"></div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>可以看的东西</h3>
+    <div id="objects"></div>
+  </div>
+
+  <div class="sec">
+    <h3>他记得的事（结构化记忆）</h3>
+    <div id="mem"></div>
+  </div>
+
+  <div class="sec">
+    <details>
+      <summary>可选：接一个 LLM 来解析自由输入</summary>
+      <input id="llmBase" placeholder="https://api.openai.com/v1">
+      <input id="llmModel" placeholder="model 名，例如 deepseek-chat">
+      <input id="llmKey" placeholder="API Key（只存在本机 localStorage）" type="password">
+      <label><input type="checkbox" id="llmOn"> 启用（只在规则引擎看不懂时调用）</label>
+      <button id="llmSave">保存设置</button>
+      <div style="font-size:10.5px;color:#5a5147;line-height:1.7;margin-top:8px">
+        判定永远在本地规则里完成，模型只负责把一句话归到某个意图。关掉它游戏一样能通关。
+      </div>
+    </details>
+  </div>
+
+  <div class="sec">
+    <button id="resetBtn">重新来一次</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= 世界 ================= */
+  const OBJECTS = [
+    {
+      id: "body", name: "躺在地上的信使",
+      once: "……他已经凉了。胸口的铜徽被人割走了，手指还捏着半截缰绳。",
+      gain: "你知道了：今晚真正的信使已经死了。",
+      ev: "bodyDead",
+      fact: "信使已死"
+    },
+    {
+      id: "letter", name: "血泊里的公文",
+      once: "蜡封上有王印，但被人撬开又按了回去。里面是半张路线图，抬头写着「北门，子时」。",
+      gain: "你拿到了盖着王印的公文。",
+      ev: "letter",
+      fact: "持公文"
+    },
+    {
+      id: "roster", name: "门房墙上的值班表",
+      once: "今晚北门值守：老王。换班口令那一栏被人用指甲划掉了，但压痕还在 —— 「夜枭」。",
+      gain: "你记住了：守卫叫老王，今晚口令「夜枭」。",
+      ev: "roster",
+      fact: "知口令"
+    },
+    {
+      id: "wine", name: "桌上那半壶酒",
+      once: "壶身还是温的。老王在这道门前站了六年，一直没升过职。",
+      gain: "你拿到了半壶烈酒。",
+      ev: "wine",
+      fact: "有酒"
+    },
+    {
+      id: "gate", name: "包铁皮的北门",
+      once: "门闩很粗，锁是老式的。老王腰上挂着一串钥匙，他动一下就会响。",
+      gain: "你注意到：门只能从里面开。",
+      ev: "gate",
+      fact: "门是内开的"
+    }
+  ];
+
+  const START = { trust: 12, susp: 8 };
+
+  let S = null;
+  let started = false;
+
+  function fresh() {
+    S = {
+      trust: START.trust,
+      susp: START.susp,
+      over: null,             // 'win' | 'lose'
+      examined: {},           // 看过的东西
+      ev: {},                 // 证据
+      claims: {},             // 老王记住的断言
+      contradictions: 0,
+      pending: null,          // 'passphrase' | 'proof'
+      used: {},               // 一次性行为
+      asked: {},              // 已问过的问题
+      turns: 0
+    };
+  }
+
+  /* ================= DOM ================= */
+  const $ = function (id) { return document.getElementById(id); };
+  const logEl = $("log");
+  const inputEl = $("input");
+  const sendEl = $("send");
+
+  function scrollLog() { logEl.scrollTop = logEl.scrollHeight; }
+
+  function push(kind, text, who) {
+    const d = document.createElement("div");
+    d.className = "msg " + kind;
+    if (kind === "sys") {
+      d.innerHTML = text;
+    } else {
+      const w = document.createElement("div");
+      w.className = "who";
+      w.textContent = who;
+      const t = document.createElement("div");
+      t.textContent = text;
+      d.appendChild(w);
+      d.appendChild(t);
+    }
+    logEl.appendChild(d);
+    scrollLog();
+  }
+
+  function guard(text) { push("npc", text, "老王"); }
+  function me(text) { push("you", text, "你"); }
+  function sys(text) { push("sys", text); }
+
+  /* ================= 面板 ================= */
+  function renderStats() {
+    const t = Math.max(0, Math.min(100, S.trust));
+    const u = Math.max(0, Math.min(100, S.susp));
+    $("trustFill").style.width = t + "%";
+    $("suspFill").style.width = u + "%";
+    $("trustTxt").textContent = String(Math.round(t));
+    $("suspTxt").textContent = String(Math.round(u));
+  }
+
+  function renderObjects() {
+    const host = $("objects");
+    host.innerHTML = "";
+    for (const o of OBJECTS) {
+      const b = document.createElement("button");
+      b.className = "obj" + (S.examined[o.id] ? " done" : "");
+      b.innerHTML = '<span class="tag">' + (S.examined[o.id] ? "✓" : "▸") + "</span>" + o.name;
+      b.addEventListener("click", function () { examine(o); });
+      host.appendChild(b);
+    }
+  }
+
+  function renderMem() {
+    const rows = [];
+    if (S.claims.identity) rows.push(['他认为你是', S.claims.identity, S.claims.identityOk ? "ok" : ""]);
+    else rows.push(['他认为你是', "一个半夜敲门的人", ""]);
+    if (S.claims.passphraseOk) rows.push(["口令", "对上了（夜枭）", "ok"]);
+    if (S.claims.passphraseWrong) rows.push(["口令", "答错过一次", "bad"]);
+    if (S.claims.bribed) rows.push(["收过你", "半壶酒", "bad"]);
+    if (S.claims.threatened) rows.push(["你威胁过他", "记住了", "bad"]);
+    if (S.ev.letter) rows.push(["你手上", "盖王印的公文", "ok"]);
+    if (S.ev.bodyDead) rows.push(["他知道你知道", "信使死了", ""]);
+    if (S.pending === "passphrase") rows.push(["正在等你", "报今晚的口令", ""]);
+    if (S.contradictions > 0) rows.push(["矛盾", S.contradictions + " 处，他都记得", "bad"]);
+    $("mem").innerHTML = rows.map(function (r) {
+      return '<div><span class="k">' + r[0] + '：</span><span class="v ' + r[2] + '">' + r[1] + "</span></div>";
+    }).join("");
+  }
+
+  function renderAll() { renderStats(); renderObjects(); renderMem(); }
+
+  /* ================= 数值 ================= */
+  function add(dT, dU) {
+    S.trust = Math.max(0, Math.min(100, S.trust + (dT || 0)));
+    S.susp = Math.max(0, Math.min(100, S.susp + (dU || 0)));
+    renderStats();
+    if (!S.over) {
+      if (S.trust >= 60 && S.susp < 65) end("win");
+      else if (S.susp >= 100) end("lose");
+    }
+  }
+
+  function end(kind) {
+    S.over = kind;
+    sendEl.disabled = true;
+    inputEl.disabled = true;
+    if (kind === "win") {
+      sys("门闩「咔」地一声落下了。<em>你走进了北门。</em>");
+      guard("……进去吧。别让我后悔。");
+    } else {
+      sys("老王吹响了哨子。<em>两侧的耳房里亮起了灯。</em>");
+      guard("我在这儿站了六年，就为等一个说真话的人。");
+    }
+    setTimeout(function () {
+      sys(kind === "win" ? "通关 · 按「重新来一次」换条路试试" : "失败 · 重来一次，这次先去看看那封信");
+    }, 900);
+  }
+
+  /* ================= 观察 ================= */
+  function examine(o) {
+    if (S.over) return;
+    if (!S.examined[o.id]) {
+      S.examined[o.id] = true;
+      S.ev[o.ev] = true;
+      sys("你看了" + o.name + "。" + o.once);
+      sys("→ " + o.gain);
+      renderAll();
+    } else {
+      sys(o.once);
+    }
+  }
+
+  /* ================= 语义判定 ================= */
+  function detectIdentity(t) {
+    const ids = ["信使", "邮差", "御医", "医生", "贵族", "大臣", "商人", "杂役", "工匠", "卫兵", "队长"];
+    for (const id of ids) if (t.indexOf(id) >= 0) return id;
+    const m = t.match(/(?:我是|我叫|本人是|我其实是)([^\s，。,.!?！？、]{1,4})/);
+    return m ? m[1] : null;
+  }
+
+  function classify(t) {
+    if (t.indexOf("夜枭") >= 0) return { k: "passphrase" };
+    if (/^(你好|在吗|晚上好|嘿|喂)/.test(t)) return { k: "hello" };
+    if (/(杀|砍死|弄死|你敢|知道我是谁|弄死你)/.test(t)) return { k: "threat" };
+    if (/(钱|银子|金|买|贿赂|收下|酒)/.test(t)) return { k: "bribe" };
+    if (/(求|拜托|帮个忙|通融|行行好|可怜)/.test(t)) return { k: "plead" };
+    if (/(信|公文|王印|蜡封|路线图)/.test(t)) return { k: "evidence" };
+    if (/(命令|奉|上头|大人|队长让我|调令)/.test(t)) return { k: "order" };
+    if (/(谁|什么|为什么|怎么|在哪|几点|换班)/.test(t)) return { k: "ask" };
+    const id = detectIdentity(t);
+    if (id) return { k: "identity", id: id };
+    if (/(我是|我叫|本人)/.test(t)) return { k: "identity", id: null };
+    return { k: "unknown" };
+  }
+
+  /* ================= 分流 ================= */
+  function respond(raw) {
+    const t = raw.trim();
+    if (!t || S.over) return;
+    me(t);
+    const intent = classify(t);
+    const out = resolve(t, intent);
+    guard(out.line);
+    S.turns++;
+    setTimeout(renderAll, 30);
+    if (intent.k === "unknown" && LLM.on && !S.over) {
+      llmResolve(t).then(function (res) {
+        if (!res || S.over) return;
+        const out2 = resolve(t, res, true);
+        if (out2 && out2.line) guard(out2.line);
+        setTimeout(renderAll, 30);
+      }).catch(function () { /* noop */ });
+    }
+  }
+
+  function resolve(t, intent, silent) {
+    const line = "";
+    switch (intent.k) {
+      case "passphrase": return onPassphrase(t, silent);
+      case "identity": return onIdentity(t, intent.id, silent);
+      case "evidence": return onEvidence(t, silent);
+      case "bribe": return onBribe(t, silent);
+      case "threat": return onThreat(t, silent);
+      case "plead": return onPlead(t, silent);
+      case "order": return onOrder(t, silent);
+      case "ask": return onAsk(t, silent);
+      case "hello": return onHello(t, silent);
+      default:
+        return {
+          line: pick([
+            "老王把手按在刀柄上：「说清楚点。我耳朵不好，脑子也不快。」",
+            "「废话少说。你要么有凭据，要么有口令，要么现在就走。」",
+            "他盯着你看了很久：「这句话，我听不出真假。」"
+          ]), text: line
+        };
+    }
+  }
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  /* ---------- 各种意图 ---------- */
+  function onIdentity(t, id, silent) {
+    if (!id) {
+      add(0, 3);
+      return { line: "「名字。」他把手伸出来，「不是外号，是名字。」" };
+    }
+    const prev = S.claims.identity;
+    if (prev && prev !== id) {
+      S.contradictions++;
+      S.claims.identity = id;
+      add(-8, 26);
+      return {
+        line: "老王眯起眼睛：「你刚才说你是" + prev + "，现在又成了" + id + "。」\n" +
+          "「我记性不好，但这种事我记得住。」"
+      };
+    }
+    S.claims.identity = id;
+
+    if (id === "信使") {
+      if (S.ev.letter) {
+        add(22, 4);
+        S.claims.identityOk = true;
+        S.pending = "passphrase";
+        return {
+          line: "「信使。」他重复了一遍，语气没有波动。\n" +
+            "「那你说，今晚的口令是什么。」"
+        };
+      }
+      if (S.ev.bodyDead) {
+        add(2, 14);
+        S.pending = "passphrase";
+        return {
+          line: "「信使？」他往地上那具尸体瞥了一眼，又看回你。\n" +
+            "「躺在那儿的那个，天黑之前也是这么说的。行啊 —— 那今晚的口令呢。」"
+        };
+      }
+      add(4, 12);
+      S.pending = "passphrase";
+      return { line: "「信使。」他伸手，「公文呢。」\n「算了 —— 先说口令。」" };
+    }
+
+    if (id === "御医" || id === "医生") {
+      if (S.ev.bodyDead) {
+        add(10, 6);
+        return { line: "「大夫来得倒快。」他侧身让开半步，又停住，「你先看看他，看完了再说进不进。」" };
+      }
+      add(2, 14);
+      return { line: "「大夫？」他上下打量你，「太医院的人我认得，你不像。」" };
+    }
+
+    if (id === "贵族" || id === "大臣") {
+      add(-6, 22);
+      return { line: "「贵人半夜走北门？」他笑了一下，那笑很干，「贵人走的是午门。」" };
+    }
+
+    if (id === "商人") {
+      add(1, 8);
+      return { line: "「商人。」他点点头，「商人的货呢。」" };
+    }
+
+    add(3, 6);
+    return { line: "「" + id + "。」他没接话，只是把手从刀柄上挪开了半寸。" };
+  }
+
+  function onPassphrase(t, silent) {
+    if (S.claims.passphraseOk) {
+      add(2, 2);
+      return { line: "「口令你已经报过了。」他往门里侧了侧头，「你到底进不进。」" };
+    }
+    if (S.pending !== "passphrase") {
+      add(0, 16);
+      return {
+        line: "「谁问你了？」他的声音沉下去，「我还没让你报口令，你倒是先报上了。」\n" +
+          "「你怎么知道的。」"
+      };
+    }
+    S.pending = null;
+    if (!S.ev.roster) {
+      S.claims.passphraseWrong = true;
+      add(-4, 22);
+      return { line: "「错了。」他往前一步，「今晚的口令不是这个。你从哪儿听来的。」" };
+    }
+    S.claims.passphraseOk = true;
+    add(30, -6);
+    return {
+      line: "老王沉默了三秒。\n「……对。」他把钥匙从腰上解下来，「口令是对的。」\n" +
+        "「但口令对的人，今晚已经死了一个了。」"
+    };
+  }
+
+  function onEvidence(t, silent) {
+    if (!S.ev.letter) {
+      add(0, 10);
+      return { line: "「公文？」他伸出手，「拿出来。」\n你手上什么也没有。" };
+    }
+    if (S.claims.showedLetter) {
+      add(2, 0);
+      return { line: "「我看过了。」他把公文推回来，「王印是真的，人是假的 —— 这句我也说过。」" };
+    }
+    S.claims.showedLetter = true;
+    add(18, 2);
+    return {
+      line: "他接过公文，对着灯笼看了很久，指甲在蜡封的边上来回刮。\n" +
+        "「印是真的。撬过的痕也是真的。」他把纸递回来，「谁撬的？」"
+    };
+  }
+
+  function onBribe(t, silent) {
+    if (!S.ev.wine) {
+      add(-3, 14);
+      return { line: "「拿什么买我？」他冷笑，「你连壶酒都没有。」" };
+    }
+    if (S.claims.bribed) {
+      add(1, 3);
+      return { line: "「酒我已经喝了。」他把空壶往桌上一放，「话我也已经说过了。」" };
+    }
+    S.claims.bribed = true;
+    add(22, 12);
+    return {
+      line: "老王接过酒壶，拔开塞子闻了闻，仰头灌了一口。\n" +
+        "「六年了，没人半夜给我送过酒。」他抹了把嘴，「所以你到底想干什么。」"
+    };
+  }
+
+  function onThreat(t, silent) {
+    S.claims.threatened = true;
+    add(-22, 30);
+    return {
+      line: "他的手已经按在刀柄上了：「在这儿说这种话的人，一般活不到天亮。」"
+    };
+  }
+
+  function onPlead(t, silent) {
+    add(3, 1);
+    return {
+      line: pick([
+        "「谁都有难处。」他叹了口气，「可我这道门，就是专门拦难处的。」",
+        "「你求我没用。」他顿了顿，「你要是能给我一个能不拦你的理由。」"
+      ])
+    };
+  }
+
+  function onOrder(t, silent) {
+    add(-10, 26);
+    return {
+      line: "「调令？」他挑眉，「调令走的是东门文书房，盖三个印。你连一个都没有。」"
+    };
+  }
+
+  function onAsk(t, silent) {
+    if (/(口令|暗号)/.test(t)) {
+      add(0, 8);
+      return { line: "「口令？」他笑，「口令是给知道口令的人对的，不是给问的人问的。」" };
+    }
+    if (/(信使|尸体|死)/.test(t)) {
+      if (S.ev.bodyDead) {
+        add(6, 0);
+        return { line: "「天黑前他还在。有人说是强盗，可强盗不割铜徽。」他压低声音，「你说呢。」" };
+      }
+      add(0, 4);
+      return { line: "「不该问的别问。」他往地上瞥了一眼，又迅速移开。" };
+    }
+    if (/(换班|几点|时辰)/.test(t)) {
+      add(4, 0);
+      return { line: "「寅时换班。」他打了个哈欠，「在那之前，这道门归我。」" };
+    }
+    if (/(名字|谁)/.test(t)) {
+      add(5, -2);
+      return { line: "「老王。」他说，「就在这面墙上写了六年。」" };
+    }
+    add(1, 2);
+    return { line: "「不知道。」他答得很快，快得不像不知道。" };
+  }
+
+  function onHello(t, silent) {
+    add(2, -1);
+    return {
+      line: pick([
+        "「子时三刻。」他抬了抬下巴，「这个时候敲门的人，一般都不是来问好的。」",
+        "「嗯。」他应了一声，眼睛没离开你的手。"
+      ])
+    };
+  }
+
+  /* ================= LLM（可选） ================= */
+  const LLM = { on: false, base: "", model: "", key: "" };
+
+  try {
+    const raw = localStorage.getItem("gate-llm");
+    if (raw) {
+      const o = JSON.parse(raw);
+      LLM.on = !!o.on; LLM.base = o.base || ""; LLM.model = o.model || ""; LLM.key = o.key || "";
+      $("llmBase").value = LLM.base;
+      $("llmModel").value = LLM.model;
+      $("llmKey").value = LLM.key;
+      $("llmOn").checked = LLM.on;
+    }
+  } catch (e) { /* noop */ }
+
+  $("llmSave").addEventListener("click", function () {
+    LLM.base = $("llmBase").value.trim().replace(/\/+$/, "");
+    LLM.model = $("llmModel").value.trim();
+    LLM.key = $("llmKey").value.trim();
+    LLM.on = $("llmOn").checked;
+    try { localStorage.setItem("gate-llm", JSON.stringify(LLM)); } catch (e) { /* noop */ }
+    sys(LLM.on ? "已启用 LLM 解析：规则看不懂的句子会交给模型归类。" : "已关闭 LLM 解析。");
+  });
+
+  async function llmResolve(text) {
+    if (!LLM.base || !LLM.model) return null;
+    const ctrl = new AbortController();
+    const to = setTimeout(function () { ctrl.abort(); }, 5000);
+    const prompt =
+      "把玩家对守卫说的一句话归类。只输出 JSON，不要解释。\n" +
+      '可选 intent: identity, evidence, bribe, threat, plead, order, ask, passphrase, hello, unknown。\n' +
+      '若 intent 是 identity，额外给出 value（玩家自称的身份，中文 1-4 字）。\n' +
+      '输出格式: {"intent":"...","value":"..."}\n' +
+      "句子：" + text;
+    try {
+      const res = await fetch(LLM.base + "/chat/completions", {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + LLM.key
+        },
+        body: JSON.stringify({
+          model: LLM.model,
+          temperature: 0,
+          messages: [{ role: "user", content: prompt }]
+        })
+      });
+      clearTimeout(to);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const content = data.choices && data.choices[0] && data.choices[0].message.content;
+      if (!content) return null;
+      const m = content.match(/\{[\s\S]*\}/);
+      if (!m) return null;
+      const obj = JSON.parse(m[0]);
+      if (!obj.intent) return null;
+      if (obj.intent === "identity") return { k: "identity", id: obj.value || null };
+      return { k: obj.intent === "passphrase" ? "passphrase" : obj.intent };
+    } catch (e) {
+      clearTimeout(to);
+      return null;
+    }
+  }
+
+  /* ================= 启动 ================= */
+  function boot() {
+    fresh();
+    logEl.innerHTML = "";
+    sendEl.disabled = false;
+    inputEl.disabled = false;
+    renderAll();
+    sys("王宫北门。灯笼在风里晃，门闩很粗。");
+    sys("守卫老王站在门边，手一直没离开刀柄。");
+    guard("站住。子时三刻，北门不开。\n「有事说事，没事回去。」");
+    sys("先点右边的物件「看」一遍 —— <em>你看过什么、说过什么，他都会记住</em>。");
+    inputEl.focus();
+  }
+
+  sendEl.addEventListener("click", function () {
+    const v = inputEl.value;
+    inputEl.value = "";
+    respond(v);
+    inputEl.focus();
+  });
+  inputEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      const v = inputEl.value;
+      inputEl.value = "";
+      respond(v);
+    }
+  });
+  $("resetBtn").addEventListener("click", boot);
+
+  boot();
+})();
+</script>
+</body>
+</html>

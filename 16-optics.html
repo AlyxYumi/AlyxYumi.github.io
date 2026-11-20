@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>光学台 · 2D 光线折射解谜</title>
+<style>
+  html,body{margin:0;min-height:100%;background:#05070b;color:#cfe0ee;overflow:hidden;
+    font-family:ui-monospace,"SFMono-Regular",Consolas,monospace;-webkit-user-select:none;user-select:none}
+  #wrap{position:fixed;inset:0;display:grid;place-items:center}
+  canvas{display:block;width:min(100vw,1180px);height:auto;cursor:crosshair;touch-action:none}
+  #bar{position:fixed;left:0;right:0;top:0;display:flex;gap:14px;align-items:center;
+    padding:10px 18px;font-size:12px;letter-spacing:.08em;color:#7d92a8;
+    background:linear-gradient(#05070bdd,#05070b00);pointer-events:none}
+  #bar .name{color:#e6f0fa;letter-spacing:.16em}
+  #bar button{pointer-events:auto;font:inherit;font-size:11px;background:#0d141c;color:#9fb4c8;
+    border:1px solid #1d2836;padding:5px 11px;cursor:pointer}
+  #bar button:hover{border-color:#31506d;color:#dff1ff}
+  #hint{position:fixed;left:0;right:0;bottom:8px;text-align:center;font-size:11px;color:#4a5b6d;letter-spacing:.06em}
+  #hint b{color:#8fa5b9;font-weight:400}
+  #win{position:fixed;inset:0;display:none;place-items:center;pointer-events:none}
+  #win.show{display:grid}
+  #win .card{background:#08101ae8;border:1px solid #2a6b52;padding:22px 40px;text-align:center;
+    box-shadow:0 0 60px #14ffa922;pointer-events:auto}
+  #win h2{margin:0 0 6px;font-size:18px;letter-spacing:.16em;color:#5effc2;font-weight:600}
+  #win p{margin:0 0 14px;font-size:12px;color:#7d92a8}
+  #win button{font:inherit;font-size:12px;background:#0f2a21;border:1px solid #2a6b52;color:#9dffd8;padding:8px 20px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv" width="1000" height="640"></canvas></div>
+<div id="bar">
+  <span class="name" id="lvlName">LEVEL</span>
+  <span id="lvlHint"></span>
+  <span style="margin-left:auto"></span>
+  <button id="prev">◀ 上一关</button>
+  <button id="reset">重来</button>
+  <button id="next">下一关 ▶</button>
+</div>
+<div id="hint">拖住镜子 / 分光镜旋转（每 15° 一档，Shift 微调）· 光束点亮圆环 · <b>R</b> 重来 · <b>1–4</b> 切关</div>
+<div id="win"><div class="card"><h2>光路接通</h2><p>所有目标已点亮</p><button id="winNext">下一关 →</button></div></div>
+
+<script>
+(function () {
+  "use strict";
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+
+  /* ================= 关卡 ================= */
+  const LEVELS = [
+    {
+      name: "01 · 第一次反射",
+      hint: "镜面把光按“入射角=反射角”弹开。拖镜子旋转（默认每 15° 一档，按住 Shift 可微调）。",
+      src: { x: 70, y: 320, a: 0 },
+      walls: [[300, 40, 300, 240], [300, 400, 300, 620]],
+      mirrors: [{ x: 520, y: 320, a: -0.5236 }],
+      splitters: [],
+      targets: [{ x: 520, y: 110 }]
+    },
+    {
+      name: "02 · 两跳",
+      hint: "一面镜子不够了：先往下，再横穿，最后向上。",
+      src: { x: 80, y: 140, a: Math.PI / 2 },
+      walls: [[380, 30, 380, 380], [560, 520, 560, 640]],
+      mirrors: [{ x: 80, y: 470, a: 1.0472 }, { x: 770, y: 470, a: -0.2618 }],
+      splitters: [],
+      targets: [{ x: 770, y: 190 }]
+    },
+    {
+      name: "03 · 分光镜",
+      hint: "分光镜会同时产生反射光和透射光 —— 一束变两束。它也能转。",
+      src: { x: 80, y: 320, a: 0 },
+      walls: [[300, 520, 700, 520], [180, 60, 180, 180]],
+      mirrors: [{ x: 820, y: 320, a: 0.5236 }],
+      splitters: [{ x: 480, y: 320, a: -0.7854 }],
+      targets: [{ x: 480, y: 120 }, { x: 820, y: 540 }]
+    },
+    {
+      name: "04 · 三镜一棱",
+      hint: "三面镜子接力。先想清楚每一段要走的方向，再回头调角度。",
+      src: { x: 80, y: 320, a: 0 },
+      walls: [[500, 180, 500, 470], [160, 60, 160, 240]],
+      mirrors: [{ x: 300, y: 320, a: 0.2618 }, { x: 300, y: 120, a: 1.0472 }, { x: 700, y: 120, a: 0.5236 }],
+      splitters: [],
+      targets: [{ x: 700, y: 540 }]
+    }
+  ];
+  const MIRROR_LEN = 74;
+  const SPLIT_LEN = 82;
+  const TARGET_R = 21;
+
+  let level = 0;
+  let mirrors = [], splitters = [], targets = [], walls = [], src = null;
+  let drag = null;
+  let won = false;
+  let hitFlash = 0;
+
+  function load(i) {
+    level = (i + LEVELS.length) % LEVELS.length;
+    const L = LEVELS[level];
+    src = { x: L.src.x, y: L.src.y, a: L.src.a };
+    walls = L.walls.map(w => w.slice());
+    mirrors = L.mirrors.map(m => ({ x: m.x, y: m.y, a: m.a }));
+    splitters = (L.splitters || []).map(m => ({ x: m.x, y: m.y, a: m.a }));
+    targets = L.targets.map(t => ({ x: t.x, y: t.y, lit: false }));
+    drag = null;
+    won = false;
+    document.getElementById("win").classList.remove("show");
+    document.getElementById("lvlName").textContent = L.name;
+    document.getElementById("lvlHint").textContent = L.hint;
+  }
+
+  /* ================= 几何 ================= */
+  function segOf(o, len) {
+    const hx = Math.cos(o.a) * len / 2, hy = Math.sin(o.a) * len / 2;
+    return { x1: o.x - hx, y1: o.y - hy, x2: o.x + hx, y2: o.y + hy };
+  }
+  function cross(ax, ay, bx, by) { return ax * by - ay * bx; }
+
+  // 返回最近的交点 {t, u, seg}
+  function hitSeg(px, py, dx, dy, s) {
+    const ex = s.x2 - s.x1, ey = s.y2 - s.y1;
+    const den = cross(dx, dy, ex, ey);
+    if (Math.abs(den) < 1e-9) return null;
+    const qx = s.x1 - px, qy = s.y1 - py;
+    const t = cross(qx, qy, ex, ey) / den;
+    const u = cross(qx, qy, dx, dy) / den;
+    if (t < 1e-4 || u < 0 || u > 1) return null;
+    return t;
+  }
+
+  function normalOf(s) {
+    const ex = s.x2 - s.x1, ey = s.y2 - s.y1;
+    const l = Math.hypot(ex, ey) || 1;
+    return { x: -ey / l, y: ex / l };
+  }
+
+  function distToSeg(px, py, s) {
+    const ex = s.x2 - s.x1, ey = s.y2 - s.y1;
+    const l2 = ex * ex + ey * ey || 1;
+    let t = ((px - s.x1) * ex + (py - s.y1) * ey) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (s.x1 + ex * t), py - (s.y1 + ey * t));
+  }
+
+  /* ================= 追踪 ================= */
+  let budget = 0;
+  const beams = [];
+
+  function trace(x, y, dx, dy, depth, hue) {
+    if (depth > 14 || budget <= 0) return;
+    budget--;
+
+    let bestT = Infinity, bestKind = "none", bestObj = null;
+    for (const w of walls) {
+      const t = hitSeg(x, y, dx, dy, w);
+      if (t !== null && t < bestT) { bestT = t; bestKind = "wall"; bestObj = w; }
+    }
+    for (const m of mirrors) {
+      const s = segOf(m, MIRROR_LEN);
+      const t = hitSeg(x, y, dx, dy, s);
+      if (t !== null && t < bestT) { bestT = t; bestKind = "mirror"; bestObj = m; }
+    }
+    for (const m of splitters) {
+      const s = segOf(m, SPLIT_LEN);
+      const t = hitSeg(x, y, dx, dy, s);
+      if (t !== null && t < bestT) { bestT = t; bestKind = "split"; bestObj = m; }
+    }
+
+    if (bestKind === "none") {
+      const ex = x + dx * 1600, ey = y + dy * 1600;
+      beams.push({ x1: x, y1: y, x2: ex, y2: ey, hue: hue });
+      checkTargets(x, y, ex, ey);
+      return;
+    }
+
+    const hx = x + dx * bestT, hy = y + dy * bestT;
+    beams.push({ x1: x, y1: y, x2: hx, y2: hy, hue: hue });
+    checkTargets(x, y, hx, hy);
+
+    if (bestKind === "wall") return;
+
+    const s = segOf(bestObj, bestKind === "mirror" ? MIRROR_LEN : SPLIT_LEN);
+    const n = normalOf(s);
+    const dot = dx * n.x + dy * n.y;
+    const rx = dx - 2 * dot * n.x;
+    const ry = dy - 2 * dot * n.y;
+    const nx2 = hx + rx * 0.5, ny2 = hy + ry * 0.5;
+
+    if (bestKind === "mirror") {
+      trace(nx2, ny2, rx, ry, depth + 1, hue);
+    } else {
+      // 分光：反射 + 透射
+      trace(nx2, ny2, rx, ry, depth + 1, (hue + 70) % 360);
+      trace(hx + dx * 0.5, hy + dy * 0.5, dx, dy, depth + 1, (hue + 190) % 360);
+    }
+  }
+
+  function checkTargets(x0, y0, x1, y1) {
+    const ex = x1 - x0, ey = y1 - y0;
+    const l2 = ex * ex + ey * ey || 1;
+    for (const tg of targets) {
+      if (tg.lit) continue;
+      let t = ((tg.x - x0) * ex + (tg.y - y0) * ey) / l2;
+      t = Math.max(0, Math.min(1, t));
+      const px = x0 + ex * t, py = y0 + ey * t;
+      if (Math.hypot(tg.x - px, tg.y - py) < TARGET_R) {
+        tg.lit = true;
+        hitFlash = 1;
+      }
+    }
+  }
+
+  /* ================= 绘制 ================= */
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // 底
+    const bg = ctx.createRadialGradient(W / 2, H / 2, 80, W / 2, H / 2, 760);
+    bg.addColorStop(0, "#0b1219");
+    bg.addColorStop(1, "#05070b");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // 网格
+    ctx.strokeStyle = "rgba(90,140,180,.055)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    // 计算光束
+    beams.length = 0;
+    budget = 56;
+    for (const tg of targets) tg.lit = false;
+    trace(src.x, src.y, Math.cos(src.a), Math.sin(src.a), 0, 45);
+
+    // 墙体
+    ctx.lineCap = "round";
+    for (const w of walls) {
+      ctx.strokeStyle = "#1c2733";
+      ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.moveTo(w[0], w[1]); ctx.lineTo(w[2], w[3]); ctx.stroke();
+      ctx.strokeStyle = "#33465a";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(w[0], w[1]); ctx.lineTo(w[2], w[3]); ctx.stroke();
+    }
+
+    // 光束
+    ctx.globalCompositeOperation = "lighter";
+    for (const b of beams) {
+      ctx.strokeStyle = "hsla(" + b.hue + ",100%,60%,.10)";
+      ctx.lineWidth = 11;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+      ctx.strokeStyle = "hsla(" + b.hue + ",100%,72%,.22)";
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+      ctx.strokeStyle = "hsla(" + b.hue + ",100%,94%,.92)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    // 目标环
+    for (const tg of targets) {
+      const lit = tg.lit;
+      if (lit) {
+        const g = ctx.createRadialGradient(tg.x, tg.y, 2, tg.x, tg.y, TARGET_R * 2.4);
+        g.addColorStop(0, "rgba(70,255,170,.55)");
+        g.addColorStop(1, "rgba(70,255,170,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(tg.x, tg.y, TARGET_R * 2.4, 0, 7); ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(tg.x, tg.y, TARGET_R, 0, Math.PI * 2);
+      ctx.strokeStyle = lit ? "#5effc2" : "rgba(120,150,180,.55)";
+      ctx.lineWidth = lit ? 3 : 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(tg.x, tg.y, TARGET_R * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = lit ? "#5effc2" : "rgba(120,150,180,.3)";
+      ctx.fill();
+    }
+
+    // 分光镜
+    for (const m of splitters) {
+      const s = segOf(m, SPLIT_LEN);
+      ctx.save();
+      ctx.setLineDash([7, 5]);
+      ctx.strokeStyle = "#ff74e0";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(m.x, m.y, 5, 0, 7);
+      ctx.fillStyle = "#ff74e0"; ctx.fill();
+      ctx.fillStyle = "rgba(255,116,224,.65)";
+      ctx.font = "10px ui-monospace,monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("SPLIT", m.x, m.y - 12);
+    }
+
+    // 镜子
+    for (const m of mirrors) {
+      const s = segOf(m, MIRROR_LEN);
+      const n = normalOf(s);
+      ctx.strokeStyle = "#38c8ff";
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+      ctx.strokeStyle = "#bdefff";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+      // 手柄
+      const hx = m.x + n.x * 0, hy = m.y; // 在中心
+      ctx.beginPath(); ctx.arc(m.x, m.y, 8, 0, 7);
+      ctx.fillStyle = drag === m ? "#e8fbff" : "#1b3c4e";
+      ctx.fill();
+      ctx.strokeStyle = "#38c8ff"; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    // 光源
+    ctx.save();
+    ctx.translate(src.x, src.y);
+    ctx.rotate(src.a);
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.moveTo(-14, -11); ctx.lineTo(10, 0); ctx.lineTo(-14, 11); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(src.x, src.y, 15, 0, 7);
+    ctx.strokeStyle = "rgba(255,209,102,.45)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 胜利
+    const allLit = targets.length > 0 && targets.every(t => t.lit);
+    if (allLit && !won) {
+      won = true;
+      document.getElementById("win").classList.add("show");
+    }
+    if (!allLit) {
+      won = false;
+      document.getElementById("win").classList.remove("show");
+    }
+    hitFlash *= 0.93;
+  }
+
+  /* ================= 交互 ================= */
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * (W / r.width),
+      y: (e.clientY - r.top) * (H / r.height)
+    };
+  }
+
+  cv.addEventListener("pointerdown", function (e) {
+    const p = pos(e);
+    let best = null, bd = 46;
+    for (const m of mirrors.concat(splitters)) {
+      const d = Math.hypot(p.x - m.x, p.y - m.y);
+      if (d < bd) { bd = d; best = m; }
+    }
+    if (best) {
+      drag = best;
+      cv.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!drag) return;
+    const p = pos(e);
+    const raw = Math.atan2(p.y - drag.y, p.x - drag.x);
+    if (e.shiftKey) {
+      drag.a = raw;
+    } else {
+      const snap = Math.PI / 12; // 15°
+      drag.a = Math.round(raw / snap) * snap;
+    }
+  });
+  cv.addEventListener("pointerup", function () { drag = null; });
+  cv.addEventListener("pointercancel", function () { drag = null; });
+
+  window.addEventListener("keydown", function (e) {
+    const k = e.key.toLowerCase();
+    if (k === "r") load(level);
+    if (k >= "1" && k <= "4") load(+k - 1);
+    if (k === "arrowright") load(level + 1);
+    if (k === "arrowleft") load(level - 1);
+  });
+
+  document.getElementById("reset").addEventListener("click", function () { load(level); });
+  document.getElementById("prev").addEventListener("click", function () { load(level - 1); });
+  document.getElementById("next").addEventListener("click", function () { load(level + 1); });
+  document.getElementById("winNext").addEventListener("click", function () { load(level + 1); });
+
+  /* ================= 循环 ================= */
+  function frame() {
+    draw();
+    requestAnimationFrame(frame);
+  }
+  load(0);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

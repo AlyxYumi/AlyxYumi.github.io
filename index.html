@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玉米</title>
+<style>
+  *{box-sizing:border-box}
+  html{background:#fff;overflow-x:hidden}
+  body{max-width:560px;margin:0 auto;padding:48px 20px;font-family:ui-serif,Georgia,"Noto Serif SC",serif;color:#111;line-height:1.9;position:relative;z-index:1}
+  canvas#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+  p{margin:0}
+  .sub{color:#666;font-size:.95rem;cursor:default;-webkit-user-select:none;user-select:none}
+  .caret{display:inline-block;width:1px;height:.95em;background:#111;margin-left:2px;vertical-align:-.05em;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  hr{border:none;border-top:1px solid #ddd;margin:36px 0}
+  section{margin-bottom:36px}
+  h2{font-size:.85rem;font-weight:400;letter-spacing:.2em;color:#999;margin:0 0 12px}
+  .list{list-style:none;padding:0;margin:0;font-size:.95rem}
+  .list li{margin-bottom:6px}
+  .list li span{color:#888}
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.show{opacity:1;transform:none}
+  .contact{display:flex;flex-wrap:wrap;gap:10px}
+  .contact a{display:inline-block;border:1px solid #ddd;padding:8px 16px;font-size:.9rem;color:#111;text-decoration:none;background:#fff}
+  .contact a:hover{background:#111;color:#fff;border-color:#111}
+  .plain{margin-top:14px;font-size:.9rem;color:#666}
+  .visited{margin-top:26px;font-size:.8rem;color:#bbb}
+  footer{color:#bbb;font-size:.8rem;margin-top:36px}
+  .hint{opacity:.5}
+  .work-btn{display:inline-block;margin-top:16px;border:1px solid #111;padding:8px 20px;font-size:.9rem;color:#111;text-decoration:none;background:#fff;transition:background .15s,color .15s}
+  .work-btn:hover{background:#111;color:#fff}
+  #status{position:fixed;right:14px;bottom:14px;display:flex;align-items:center;gap:8px;border:1px solid #ddd;background:#fff;padding:6px 12px;font-size:.78rem;color:#555;z-index:5;white-space:nowrap}
+  #status .dot{width:6px;height:6px;border:0;border-radius:50%;background:#111;animation:pulse 2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.15}}
+  #game{position:fixed;inset:0;background:rgba(255,255,255,.94);display:none;align-items:center;justify-content:center;z-index:50}
+  #game.open{display:flex}
+  #game .panel{width:min(340px,86vw);border:1px solid #111;padding:24px 22px;background:#fff;text-align:center}
+  #game h3{font-size:1rem;font-weight:400;letter-spacing:.15em;margin:0 0 6px}
+  #game .tip{font-size:.8rem;color:#888;margin-bottom:18px}
+  #track{position:relative;height:44px;border:1px solid #111;overflow:hidden;cursor:pointer;-webkit-user-select:none;user-select:none}
+  #target{position:absolute;top:0;bottom:0;left:40%;width:20%;background:#f2f2f2;border-left:1px solid #ddd;border-right:1px solid #ddd}
+  #marker{position:absolute;top:0;bottom:0;width:3px;background:#111;left:0}
+  .meta{display:flex;justify-content:space-between;margin-top:12px;font-size:.85rem;color:#666}
+  #game button{font:inherit;font-size:.85rem;border:1px solid #111;background:#fff;padding:6px 20px;cursor:pointer}
+  #game button:hover{background:#111;color:#fff}
+  #progress{position:fixed;top:0;left:0;height:2px;width:0;background:#111;z-index:99}
+  .corn{position:fixed;top:-40px;left:0;z-index:80;pointer-events:none;-webkit-user-select:none;user-select:none;animation-name:cornfall;animation-timing-function:linear;animation-fill-mode:forwards;will-change:transform}
+  @keyframes cornfall{to{transform:translateY(112vh) rotate(360deg)}}
+  #cornBtn{cursor:pointer;opacity:.55;margin-left:4px;transition:transform .18s ease}
+  #cornBtn:hover{opacity:1}
+  ::selection{background:#ffd54a;color:#111}
+  .fortune{margin-top:16px;font-size:.85rem;color:#999}
+  .cornBurst{position:fixed;z-index:81;pointer-events:none;animation-name:burst;animation-timing-function:ease-out;animation-fill-mode:forwards}
+  @keyframes burst{from{opacity:1;transform:translateY(0) rotate(0)}to{opacity:0;transform:translateY(150px) rotate(200deg)}}
+  .crawl{position:fixed;bottom:2px;left:-60px;font-size:22px;z-index:79;pointer-events:none;animation:crawl 12s linear forwards}
+  @keyframes crawl{to{transform:translateX(calc(100vw + 90px))}}
+  html.flip{transition:transform .6s ease;transform:rotate(180deg)}
+  #bottomMsg{position:fixed;left:14px;bottom:14px;font-size:.78rem;color:#bbb;opacity:0;transition:opacity .4s;z-index:5}
+  #bottomMsg.show{opacity:1}
+</style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div id="progress"></div>
+
+  <p class="sub"><span id="typed"></span><span class="caret"></span></p>
+
+  <hr>
+
+  <p class="fortune" id="fortune"></p>
+
+  <section>
+    <h2>关于</h2>
+    <p>白天在上学，晚上在打游戏。Minecraft 玩了好几年，建筑水平随缘；adofai 最近卡在一关，哪一关就不说了。偶尔也写点代码。</p>
+  </section>
+
+  <section>
+    <h2>项目</h2>
+    <a class="work-btn" href="yumi.html">游戏中心 →</a>
+  </section>
+
+  <section>
+    <h2>联系</h2>
+    <div class="contact">
+      <a href="https://github.com/AlyxYumi" target="_blank">GitHub</a>
+      <a href="https://space.bilibili.com/3706977265912740" target="_blank">B站</a>
+    </div>
+    <p class="plain">
+      邮箱 q2q7y@outlook.com<br>
+      微信 ilyYumi（没事不要加）
+    </p>
+  </section>
+
+  <p class="visited">已被偷看 <span id="visits">0</span> 次</p>
+
+  <footer>玉米 · 2026 <span class="hint">（连点首行文字有彩蛋）</span><span id="cornBtn" title="🌽">🌽</span></footer>
+
+  <div id="status"><span class="dot"></span><span id="statusText"></span></div>
+  <div id="bottomMsg">到底了</div>
+
+  <div id="game">
+    <div class="panel">
+      <h3>节奏点击</h3>
+      <p class="tip">在竖线扫到中间区域时点击或按空格</p>
+      <div id="track"><div id="target"></div><div id="marker"></div></div>
+      <div class="meta"><span id="score">0</span><span id="best">最高 0</span></div>
+      <p style="margin-top:16px"><button id="closeGame">关闭</button></p>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // 打字机
+    var typed=document.getElementById('typed'),
+        text='学生。主线任务是上学，支线是 Minecraft 和冰与火之舞。',
+        i=0;
+    setTimeout(function(){
+      var t=setInterval(function(){
+        typed.textContent=text.slice(0,++i);
+        if(i>=text.length)clearInterval(t);
+      },55);
+    },450);
+
+    // 滚动渐入
+    var ss=document.querySelectorAll('section');
+    if('IntersectionObserver' in window){
+      var io=new IntersectionObserver(function(es){
+        es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});
+      },{threshold:.15});
+      ss.forEach(function(s){s.classList.add('reveal');io.observe(s);});
+    }
+
+    // 访问计数：免费公共接口（Abacus），失败时退回本机记录
+    var vid=document.getElementById('visits'),localN=0;
+    try{
+      localN=(parseInt(localStorage.getItem('yumi_visits')||'0',10)||0)+1;
+      localStorage.setItem('yumi_visits',localN);
+    }catch(e){}
+    fetch('https://abacus.jasoncameron.dev/hit/yumi-homepage/visits')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d&&typeof d.value==='number'){
+          vid.textContent=d.value;
+          if(d.value>0&&d.value%100===0)cornRain();
+        }else{vid.textContent=localN||'?';}
+      })
+      .catch(function(){
+        vid.textContent=localN||'?';
+      });
+
+    // 实时状态（100 句随机轮换）
+    var st=document.getElementById('statusText'),specialUntil=0,specialText='';
+    var LINES=[
+      '大概在写作业','大概在上课','大概在摸鱼','大概在发呆','大概在睡觉',
+      '在打 Minecraft','在打 adofai','在挖矿','在盖房子','在存档',
+      '在被苦力怕追','被苦力怕炸了','在修房子','在钓鱼','在养小鸡',
+      '在刷 B 站','在刷短视频','在刷评论区','在看攻略','在追番',
+      '在等更新','在等放学','在等周末','在数还有几分钟下课','在偷看时间',
+      '在假装听讲','在打瞌睡','在梦里打游戏','在补作业','在抄作业',
+      '在找作业','在背单词','在背课文','在写卷子','在改错题',
+      '在算数学','在纠结选哪个','在等妈妈喊吃饭','在吃饭','在吃泡面',
+      '在喝奶茶','在吃零食','在剥玉米','在啃玉米','在烤玉米',
+      '在数玉米粒','在偷玉米','在运玉米','在晒玉米','在玉米地里',
+      '在变成玉米','在听歌','在找单曲循环','在调音量','在带耳机',
+      '在练 adofai','在卡关','在摔键盘','在重开','在等加载',
+      '在开黑','在等队友','在摆烂','在躺平','在刷存在感',
+      '在思考人生','在重启人生','在计划周末','在数还有几天放假','在想周末干嘛',
+      '在刷题','在抄笔记','在整理书包','在找充电器','在充电',
+      '在断网中','在等网络恢复','在刷牙','在关灯','在想着要不要睡觉',
+      '在偷看你的屏幕','在假装很忙','在偷偷卷','在偷偷玩手机','在被没收手机',
+      '在纠结要不要学习','在假装努力学习','在学习（假装）','在背书（假装）','在摸鱼中',
+      '在打游戏','在发呆中','在等饭','在喝水','在发呆数羊',
+      '在等生日','在等放假','在幻想不用上学','在数星星','在偷偷开心'
+    ];
+    var lastIdx=-1;
+    function pickLine(){
+      if(LINES.length<2){lastIdx=0;return LINES[0];}
+      var i=Math.floor(Math.random()*LINES.length);
+      if(i===lastIdx)i=(i+1)%LINES.length;
+      lastIdx=i;return LINES[i];
+    }
+    function ph(){
+      if(Date.now()<specialUntil){st.textContent=specialText;return;}
+      var d=new Date(),h=d.getHours(),m=d.getMinutes(),line;
+      line=(h<5)?(pickLine()+'（熬夜冠军）'):pickLine();
+      st.textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m+' · '+line;
+    }
+    ph();setInterval(ph,30000);
+
+    // 鼠标粒子
+    var c=document.getElementById('bg'),ctx=c.getContext('2d'),
+        W=0,H=0,pts=[],mouse={x:-999,y:-999};
+    function resize(){
+      var dpr=Math.min(window.devicePixelRatio||1,2);
+      W=innerWidth;H=innerHeight;
+      c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      var n=Math.min(80,Math.floor(W*H/16000));
+      pts=[];
+      for(var a=0;a<n;a++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25});
+    }
+    addEventListener('resize',resize);
+    addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY;});
+    addEventListener('mouseleave',function(){mouse.x=-999;mouse.y=-999;});
+    resize();
+    function frame(){
+      ctx.clearRect(0,0,W,H);
+      var a,b;
+      for(a=0;a<pts.length;a++){
+        var p=pts[a];
+        p.x+=p.vx;p.y+=p.vy;
+        if(mouse.x>-500){
+          var dx=mouse.x-p.x,dy=mouse.y-p.y,dd=Math.hypot(dx,dy);
+          if(dd<180&&dd>.1){p.x+=dx/dd*.45;p.y+=dy/dd*.45;}
+        }
+        if(p.x<-10)p.x=W+10;if(p.x>W+10)p.x=-10;
+        if(p.y<-10)p.y=H+10;if(p.y>H+10)p.y=-10;
+      }
+      for(a=0;a<pts.length;a++){
+        for(b=a+1;b<pts.length;b++){
+          var e=pts[a],f=pts[b],dist=Math.hypot(e.x-f.x,e.y-f.y);
+          if(dist<80){
+            ctx.strokeStyle='rgba(0,0,0,'+((1-dist/80)*.10).toFixed(3)+')';
+            ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(f.x,f.y);ctx.stroke();
+          }
+        }
+      }
+      if(mouse.x>-500){
+        for(a=0;a<pts.length;a++){
+          var q=pts[a],dq=Math.hypot(mouse.x-q.x,mouse.y-q.y);
+          if(dq<140){
+            ctx.strokeStyle='rgba(0,0,0,'+((1-dq/140)*.16).toFixed(3)+')';
+            ctx.beginPath();ctx.moveTo(mouse.x,mouse.y);ctx.lineTo(q.x,q.y);ctx.stroke();
+          }
+        }
+      }
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      for(a=0;a<pts.length;a++){ctx.beginPath();ctx.arc(pts[a].x,pts[a].y,1.6,0,Math.PI*2);ctx.fill();}
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    // 彩蛋：连点首行文字 5 下
+    var hook=document.querySelector('.sub'),last=0,clicks=0;
+    hook.addEventListener('click',function(){
+      var now=Date.now();
+      if(now-last>1200)clicks=0;
+      clicks++;last=now;
+      if(clicks>=5)openGame();
+    });
+
+    // 小游戏
+    var game=document.getElementById('game'),marker=document.getElementById('marker'),
+        target=document.getElementById('target'),scoreEl=document.getElementById('score'),
+        bestEl=document.getElementById('best'),track=document.getElementById('track'),
+        playing=false,pos=0,dir=1,speed=.012,score=0,
+        best=(parseInt(localStorage.getItem('yumi_game_best')||'0',10)||0);
+    bestEl.textContent='最高 '+best;
+    function hit(){
+      if(!playing)return;
+      var x=pos*100;
+      if(x>=40&&x<=60){
+        score++;scoreEl.textContent=score;
+        speed=Math.min(.03,speed+.0009);
+        target.style.background='#111';
+        setTimeout(function(){target.style.background='';},110);
+      }else{
+        score=0;scoreEl.textContent=0;
+      }
+    }
+    track.addEventListener('click',hit);
+    function tick(){
+      if(!playing)return;
+      pos+=dir*speed;
+      if(pos>1){pos=1;dir=-1;}
+      if(pos<0){pos=0;dir=1;}
+      marker.style.left=(pos*100)+'%';
+      requestAnimationFrame(tick);
+    }
+    function openGame(){
+      game.classList.add('open');
+      playing=true;pos=0;dir=1;speed=.012;score=0;
+      scoreEl.textContent='0';marker.style.left='0%';
+      requestAnimationFrame(tick);
+    }
+    function closeGame(){
+      playing=false;game.classList.remove('open');
+      if(score>best){best=score;try{localStorage.setItem('yumi_game_best',best);}catch(e){}}
+      bestEl.textContent='最高 '+best;
+    }
+    document.getElementById('closeGame').addEventListener('click',closeGame);
+    addEventListener('keydown',function(e){
+      if(!playing)return;
+      if(e.code==='Space'){e.preventDefault();hit();}
+      if(e.key==='Escape')closeGame();
+    });
+
+    // 阅读进度
+    var bar=document.getElementById('progress');
+    function prog(){
+      var max=document.documentElement.scrollHeight-innerHeight;
+      bar.style.width=(max>0?Math.min(100,Math.max(0,scrollY/max*100)):0)+'%';
+    }
+    addEventListener('scroll',prog,{passive:true});
+    addEventListener('resize',prog);
+    prog();
+
+    // 切走标签页改标题
+    var origTitle=document.title;
+    document.addEventListener('visibilitychange',function(){
+      document.title=document.hidden?'(◕‿◕) 你去哪了':origTitle;
+    });
+
+    // 玉米雨
+    var raining=false;
+    function cornRain(){
+      if(raining)return;raining=true;
+      for(var k=0;k<36;k++){
+        var el=document.createElement('div');
+        el.className='corn';
+        el.textContent='🌽';
+        el.style.left=(Math.random()*96)+'vw';
+        el.style.fontSize=(18+Math.random()*26)+'px';
+        el.style.animationDuration=(3.5+Math.random()*2.5)+'s';
+        el.style.animationDelay=(Math.random()*1.2)+'s';
+        document.body.appendChild(el);
+        setTimeout(el.remove.bind(el),7600);
+      }
+      setTimeout(function(){raining=false;},7600);
+    }
+    var seq='';
+    addEventListener('keydown',function(e){
+      if(game.classList.contains('open'))return;
+      if(e.key&&e.key.length===1)seq=(seq+e.key.toLowerCase()).slice(-8);
+      if(seq.indexOf('corn')>-1){seq='';cornRain();}
+    });
+    document.getElementById('cornBtn').addEventListener('click',function(e){e.stopPropagation();cornRain();});
+
+    // 摸鱼 3 分钟的小提醒
+    setTimeout(function(){
+      if(!document.hidden){
+        specialText='已摸鱼 3 分钟，作业写完了吗？';
+        specialUntil=Date.now()+15000;
+        ph();
+      }
+    },180000);
+
+    // 今日运势（按日期固定）
+    (function(){
+      var yi=['打游戏','睡懒觉','摸鱼','刷 B 站','挖矿','发呆','喝奶茶','摆烂','听歌','看番','写作业','吃玉米'];
+      var ji=['早起','写作业','上学','跑步','熬夜','背单词','和人说话','出门','考试','整理房间','断网','吃青菜'];
+      var d=new Date(),seed=d.getFullYear()*372+(d.getMonth()+1)*31+d.getDate();
+      function rnd(n,off){var x=Math.sin(seed*9277+off)*10000;return Math.floor((x-Math.floor(x))*n);}
+      var a=yi[rnd(yi.length,1)],b=ji[rnd(ji.length,2)];
+      if(a===b)b=ji[(rnd(ji.length,2)+1)%ji.length];
+      document.getElementById('fortune').textContent='今日：宜'+a+'，忌'+b+'。';
+    })();
+
+    // 双击空白处喷玉米粒
+    addEventListener('dblclick',function(e){
+      if(game.classList.contains('open'))return;
+      for(var k=0;k<6;k++){
+        var el=document.createElement('div');
+        el.className='cornBurst';el.textContent='🌽';
+        el.style.left=(e.clientX+(Math.random()-.5)*80)+'px';
+        el.style.top=(e.clientY+(Math.random()-.5)*30)+'px';
+        el.style.fontSize=(14+Math.random()*14)+'px';
+        el.style.animationDuration=(.8+Math.random()*.5)+'s';
+        document.body.appendChild(el);
+        setTimeout(el.remove.bind(el),1600);
+      }
+    });
+
+    // 会躲的玉米
+    var cornBtn=document.getElementById('cornBtn'),cornBase=null;
+    function measureCorn(){
+      cornBtn.style.transform='';
+      var r=cornBtn.getBoundingClientRect();
+      cornBase={x:r.left+scrollX+r.width/2,y:r.top+scrollY+r.height/2};
+    }
+    measureCorn();addEventListener('resize',measureCorn);
+    addEventListener('mousemove',function(e){
+      if(!cornBase)return;
+      var dx=cornBase.x-scrollX-e.clientX,dy=cornBase.y-scrollY-e.clientY;
+      if(Math.hypot(dx,dy)<90){
+        var ang=Math.atan2(dy,dx);
+        cornBtn.style.transform='translate('+(Math.cos(ang)*40).toFixed(1)+'px,'+(Math.sin(ang)*24-4).toFixed(1)+'px)';
+      }else{cornBtn.style.transform='';}
+    });
+
+    // 复制时偷偷加签名
+    document.addEventListener('copy',function(e){
+      try{
+        var sel=window.getSelection?window.getSelection().toString():'';
+        if(sel&&sel.indexOf('来自玉米的主页')<0){
+          e.clipboardData.setData('text/plain',sel+' —— 来自玉米的主页');
+          e.preventDefault();
+        }
+      }catch(err){}
+    });
+
+    // Konami 彩蛋：页面倒过来 3 秒
+    var kon=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','KeyB','KeyA'],kp=0;
+    addEventListener('keydown',function(e){
+      if(game.classList.contains('open'))return;
+      if(e.code===kon[kp]){
+        kp++;
+        if(kp===kon.length){
+          kp=0;
+          var root=document.documentElement;
+          root.classList.add('flip');
+          setTimeout(function(){root.classList.remove('flip');},3000);
+        }
+      }else{kp=(e.code===kon[0])?1:0;}
+    });
+
+    // 鼠标闲着 15 秒，一颗玉米慢慢爬过
+    var lastAct=Date.now(),crawling=false;
+    ['mousemove','mousedown','keydown','scroll','touchstart'].forEach(function(ev){
+      addEventListener(ev,function(){lastAct=Date.now();},{passive:true});
+    });
+    setInterval(function(){
+      if(crawling||document.hidden||game.classList.contains('open'))return;
+      if(Date.now()-lastAct>15000){
+        crawling=true;
+        var el=document.createElement('div');
+        el.className='crawl';el.textContent='🌽';
+        document.body.appendChild(el);
+        setTimeout(function(){el.remove();crawling=false;lastAct=Date.now();},13000);
+      }
+    },1000);
+
+    // 到底了
+    var bm=document.getElementById('bottomMsg');
+    function btm(){
+      var d=document.documentElement;
+      bm.classList.toggle('show',(innerHeight+scrollY)>=d.scrollHeight-8);
+    }
+    addEventListener('scroll',btm,{passive:true});
+    addEventListener('resize',btm);
+    btm();
+
+    console.log('%c🌽 被你发现了。输入 corn，或者点页面底部的玉米。','color:#999;font-size:12px');
+  })();
+  </script>
+</body>
+</html>
